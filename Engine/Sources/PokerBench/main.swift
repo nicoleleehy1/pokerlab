@@ -1,7 +1,8 @@
 import PokerCore
+import PokerSolver
 
 // PokerBench: prints throughput numbers for BENCHMARKS.md. Run with:
-//   swift run -c release PokerBench
+//   swift run -c release PokerBench [core|solver|all]   (default: all)
 let clock = ContinuousClock()
 
 func seconds(_ d: Duration) -> Double {
@@ -24,6 +25,31 @@ let cores = EquityCalculator.defaultParallelism
 print("PokerBench | \(cores) logical cores")
 print("")
 
+let mode = CommandLine.arguments.dropFirst().first ?? "all"
+var checksum: UInt64 = 0
+if mode == "core" || mode == "all" { try await runCore() }
+if mode == "solver" || mode == "all" { try await runSolver() }
+print("")
+print("checksum \(checksum)")
+
+nonisolated func enumerateAll(firsts: some Sequence<Int>) -> UInt64 {
+    let eval = HandEvaluator.shared
+    var local: UInt64 = 0
+    for a in firsts {
+        let ka = eval.adding(Card(rawValue: UInt8(a)), to: .empty)
+        for b in (a+1)..<52 { let kb = eval.adding(Card(rawValue: UInt8(b)), to: ka)
+        for c in (b+1)..<52 { let kc = eval.adding(Card(rawValue: UInt8(c)), to: kb)
+        for d in (c+1)..<52 { let kd = eval.adding(Card(rawValue: UInt8(d)), to: kc)
+        for e in (d+1)..<52 { let ke = eval.adding(Card(rawValue: UInt8(e)), to: kd)
+        for f in (e+1)..<52 { let kf = eval.adding(Card(rawValue: UInt8(f)), to: ke)
+        for g in (f+1)..<52 {
+            local &+= UInt64(eval.evaluate(eval.adding(Card(rawValue: UInt8(g)), to: kf)).rawValue)
+        } } } } } }
+    }
+    return local
+}
+
+@MainActor func runCore() async throws {
 // 1. Table construction (first use).
 var t0 = clock.now
 let tables = EvaluatorTables.shared
@@ -40,7 +66,6 @@ for _ in 0..<handCount {
     while s.count < 7 { s.insert(Card(rawValue: UInt8(rng.next(below: 52)))) }
     hands.append(s)
 }
-var checksum: UInt64 = 0
 let rounds = 20
 t0 = clock.now
 for _ in 0..<rounds { for h in hands { checksum &+= UInt64(eval.evaluate(h).rawValue) } }
@@ -55,21 +80,6 @@ let refRate = Double(refCount) / seconds(clock.now - t0)
 print("Reference evaluator (21 subsets, 1 thread):       \(fmt(refRate / 1e3, 1))K/s  -> fast is \(fmt(randomRate / refRate, 0))x faster")
 
 // 4. Exhaustive enumeration of all 133,784,560 7-card hands with incremental keys.
-func enumerateAll(firsts: some Sequence<Int>) -> UInt64 {
-    var local: UInt64 = 0
-    for a in firsts {
-        let ka = eval.adding(Card(rawValue: UInt8(a)), to: .empty)
-        for b in (a+1)..<52 { let kb = eval.adding(Card(rawValue: UInt8(b)), to: ka)
-        for c in (b+1)..<52 { let kc = eval.adding(Card(rawValue: UInt8(c)), to: kb)
-        for d in (c+1)..<52 { let kd = eval.adding(Card(rawValue: UInt8(d)), to: kc)
-        for e in (d+1)..<52 { let ke = eval.adding(Card(rawValue: UInt8(e)), to: kd)
-        for f in (e+1)..<52 { let kf = eval.adding(Card(rawValue: UInt8(f)), to: ke)
-        for g in (f+1)..<52 {
-            local &+= UInt64(eval.evaluate(eval.adding(Card(rawValue: UInt8(g)), to: kf)).rawValue)
-        } } } } } }
-    }
-    return local
-}
 t0 = clock.now
 checksum &+= enumerateAll(firsts: 0..<46)
 let enumSingle = seconds(clock.now - t0)
@@ -123,5 +133,58 @@ for target in [0.005, 0.001] {
         print("Stream to ±\(fmt(target * 100, 1))%: \(fmt(seconds(l.elapsed) * 1000, 1)) ms, \(l.samples) trials, \(count) snapshots")
     }
 }
-print("")
-print("checksum \(checksum)")
+}
+
+@MainActor func runSolver() async throws {
+    print("")
+    print("Push/fold CFR+ solver: 40 stack depths (1.0 to 20.5 bb), 2,000 iterations each")
+    let stacks = (0..<40).map { 1.0 + 0.5 * Double($0) }
+    let iterations = 2000
+    let cpu = CFRPlusSolver()
+    // Exploitability checkpoints are excluded from all timings (checkpoint once at the end).
+    var t0 = clock.now
+    let scalar = stacks.map { cpu.solve(stack: $0, iterations: iterations, checkpointEvery: iterations, backend: .scalar) }
+    let scalarWall = seconds(clock.now - t0)
+    let scalarSolve = scalar.reduce(0) { $0 + $1.elapsedSeconds }
+    t0 = clock.now
+    let simd = stacks.map { cpu.solve(stack: $0, iterations: iterations, checkpointEvery: iterations, backend: .simd) }
+    let simdSolve = simd.reduce(0) { $0 + $1.elapsedSeconds }
+    _ = clock.now - t0
+    t0 = clock.now
+    let parallel = await cpu.solve(stacks: stacks, iterations: iterations, checkpointEvery: iterations, backend: .simd)
+    let parallelWall = seconds(clock.now - t0)
+    let iterTotal = Double(stacks.count * iterations)
+    print("CPU scalar, 1 thread:        \(fmt(scalarSolve * 1000, 1)) ms  (\(fmt(iterTotal / scalarSolve / 1000, 1))K iterations/s; wall incl. checkpoints \(fmt(scalarWall * 1000, 0)) ms)")
+    print("CPU SIMD16, 1 thread:        \(fmt(simdSolve * 1000, 1)) ms  (\(fmt(iterTotal / simdSolve / 1000, 1))K iterations/s) -> \(fmt(scalarSolve / simdSolve, 1))x vs scalar")
+    print("CPU SIMD16, \(cores) tasks:       \(fmt(parallelWall * 1000, 1)) ms wall (incl. checkpoint) -> \(fmt(scalarSolve / parallelWall, 1))x vs scalar")
+    if let gpu = try? MetalCFRSolver() {
+        for kernel in MetalCFRSolver.Kernel.allCases {
+            _ = try gpu.solve(stacks: stacks, iterations: 50, checkpointEvery: 50, kernel: kernel) // warm-up
+            t0 = clock.now
+            let g = try gpu.solve(stacks: stacks, iterations: iterations, checkpointEvery: iterations, kernel: kernel)
+            let gpuWall = seconds(clock.now - t0)
+            let gpuTime = g[0].elapsedSeconds
+            var maxDiff = 0.0
+            for d in stacks.indices { for k in 0..<169 { maxDiff = max(maxDiff, abs(g[d].push[k] - simd[d].push[k]), abs(g[d].call[k] - simd[d].call[k])) } }
+            print("Metal \(kernel.rawValue) (\(gpu.deviceName)): \(fmt(gpuTime * 1000, 1)) ms GPU, \(fmt(gpuWall * 1000, 1)) ms wall -> \(fmt(scalarSolve / gpuTime, 1))x vs scalar, \(fmt(simdSolve / gpuTime, 1))x vs SIMD 1 thread, \(fmt(parallelWall / gpuWall, 2))x vs SIMD \(cores) tasks; max diff vs CPU \(fmt(maxDiff * 100, 3))%, worst exploitability \(fmt(g.map(\.exploitability).max()!, 4)) mbb")
+        }
+        // Larger batch: a fine 1/16 bb grid from 1 to 21 bb (320 depths).
+        let fine = (0..<320).map { 1.0 + Double($0) / 16 }
+        t0 = clock.now
+        let cpuFine = await cpu.solve(stacks: fine, iterations: iterations, checkpointEvery: iterations, backend: .simd)
+        let cpuFineWall = seconds(clock.now - t0)
+        t0 = clock.now
+        let gpuFine = try gpu.solve(stacks: fine, iterations: iterations, checkpointEvery: iterations)
+        let gpuFineWall = seconds(clock.now - t0)
+        print("320 depths x \(iterations) iterations: CPU SIMD \(cores) tasks \(fmt(cpuFineWall * 1000, 0)) ms wall, Metal simd-group kernel \(fmt(gpuFine[0].elapsedSeconds * 1000, 0)) ms GPU / \(fmt(gpuFineWall * 1000, 0)) ms wall (both incl. one exploitability checkpoint per depth) -> \(fmt(cpuFineWall / gpuFineWall, 2))x; worst exploitability CPU \(fmt(cpuFine.map(\.exploitability).max()!, 4)), GPU \(fmt(gpuFine.map(\.exploitability).max()!, 4)) mbb")
+    } else {
+        print("Metal unavailable on this machine")
+    }
+    print("Worst CPU exploitability after \(iterations) iterations: \(fmt(parallel.map(\.exploitability).max()!, 4)) mbb/hand")
+    // Convergence curve for one depth (the Solver screen shows this).
+    let curve = cpu.solve(stack: 10, iterations: 1000, checkpointEvery: 1)
+    let marks = [1, 10, 100, 1000]
+    print("10 bb exploitability (mbb/hand) at iterations " + marks.map { "\($0): \(fmt(curve.curve[$0 - 1].exploitability, 3))" }.joined(separator: ", "))
+    let ten = curve
+    print("10 bb Nash: shove \(fmt(ten.pushFraction * 100, 1))% of hands, call \(fmt(ten.callFraction * 100, 1))%")
+}
