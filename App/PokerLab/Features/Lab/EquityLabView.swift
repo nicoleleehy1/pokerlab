@@ -22,6 +22,7 @@ struct LabTab: View {
 }
 
 struct EquityLabView: View {
+    @Environment(AppRouter.self) private var router
     @State private var model = EquityLabModel()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -49,8 +50,10 @@ struct EquityLabView: View {
         }
         .sensoryFeedback(.impact(weight: .light), trigger: model.completedRuns)
         .onAppear { if model.snapshot == nil { model.recompute() } }
-        .onReceive(NotificationCenter.default.publisher(for: .loadEquityLabSpot)) { note in
-            if let spot = note.object as? LabSpot { model.load(hero: spot.hero, villain: spot.villainRange, villainCards: spot.villainCards, board: spot.board) }
+        .onChange(of: router.pendingLabSpot.map(ObjectIdentifier.init), initial: true) {
+            guard let spot = router.pendingLabSpot else { return }
+            router.pendingLabSpot = nil
+            model.load(hero: spot.hero, villain: spot.villainRange, villainCards: spot.villainCards, board: spot.board)
         }
     }
 
@@ -186,14 +189,10 @@ struct EquityLabView: View {
 }
 
 /// A spot pushed into the Equity Lab from elsewhere (camera, App Intents).
-final class LabSpot: @unchecked Sendable {
+final class LabSpot: Sendable {
     let hero: [Card], villainCards: [Card], board: [Card]
     let villainRange: HandRange?
     init(hero: [Card], villainCards: [Card] = [], villainRange: HandRange? = nil, board: [Card]) {
         self.hero = hero; self.villainCards = villainCards; self.villainRange = villainRange; self.board = board
     }
-}
-
-extension Notification.Name {
-    static let loadEquityLabSpot = Notification.Name("PokerLab.loadEquityLabSpot")
 }

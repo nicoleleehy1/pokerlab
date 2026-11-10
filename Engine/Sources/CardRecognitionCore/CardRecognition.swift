@@ -59,7 +59,7 @@ public struct FrameDebouncer: Sendable {
     /// Feeds one frame; returns the confirmed set after it.
     @discardableResult
     public mutating func ingest(_ detections: [CardDetection]) -> Set<Card> {
-        // Keep the best detection per card; a physical card can only be one card.
+        // A card counts once per frame however many boxes the model put on it.
         let seen = Set(detections.filter { $0.confidence >= minimumConfidence }.map(\.card))
         frames.append(seen)
         if frames.count > window { frames.removeFirst(frames.count - window) }
@@ -95,5 +95,39 @@ extension String {
         while s.first?.isWhitespace == true { s = s.dropFirst() }
         while s.last?.isWhitespace == true { s = s.dropLast() }
         return String(s)
+    }
+}
+
+/// Maps a normalised Vision bounding box onto a view that shows the camera image with
+/// aspect-fill (the preview layer's `.resizeAspectFill`). Vision boxes have their origin at the
+/// bottom-left; the returned rect uses UIKit's top-left origin, in view points.
+public enum OverlayGeometry {
+    public struct Rect: Equatable, Sendable {
+        public var x, y, width, height: Double
+        public init(x: Double, y: Double, width: Double, height: Double) {
+            self.x = x; self.y = y; self.width = width; self.height = height
+        }
+    }
+
+    /// - Parameters:
+    ///   - box: normalised box, origin bottom-left (as Vision reports it).
+    ///   - imageAspect: width / height of the analysed image (after rotation).
+    ///   - viewWidth, viewHeight: size of the preview view in points.
+    public static func viewRect(for box: Rect, imageAspect: Double, viewWidth: Double, viewHeight: Double) -> Rect {
+        let viewAspect = viewWidth / viewHeight
+        // Aspect-fill: the image is scaled until it covers the view, the overflow is cropped evenly.
+        let drawnWidth: Double, drawnHeight: Double
+        if imageAspect > viewAspect {
+            drawnHeight = viewHeight; drawnWidth = viewHeight * imageAspect
+        } else {
+            drawnWidth = viewWidth; drawnHeight = viewWidth / imageAspect
+        }
+        let offsetX = (viewWidth - drawnWidth) / 2
+        let offsetY = (viewHeight - drawnHeight) / 2
+        let flippedY = 1 - box.y - box.height
+        return Rect(x: offsetX + box.x * drawnWidth,
+                    y: offsetY + flippedY * drawnHeight,
+                    width: box.width * drawnWidth,
+                    height: box.height * drawnHeight)
     }
 }

@@ -11,6 +11,16 @@ final class AppRouter {
     var tab: AppTab = .today
     var trainPath = NavigationPath()
     var labPath = NavigationPath()
+    /// A spot waiting to be loaded by the Equity Lab (from the camera or an App Intent).
+    var pendingLabSpot: LabSpot?
+
+    /// Shows the Equity Lab root with `spot` loaded.
+    func sendToLab(_ spot: LabSpot) {
+        pendingLabSpot = spot
+        labPath = NavigationPath()
+        trainPath = NavigationPath()
+        tab = .lab
+    }
 
     enum Destination: Hashable {
         case drill(DrillKind)
