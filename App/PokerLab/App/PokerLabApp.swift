@@ -12,7 +12,7 @@ enum AppConfig {
 
 @main
 struct PokerLabApp: App {
-    @State private var router = AppRouter()
+    @State private var router = AppRouter.shared
     let container: ModelContainer
 
     init() {

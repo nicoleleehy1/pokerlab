@@ -8,6 +8,9 @@ enum AppTab: String, Hashable, CaseIterable {
 /// Navigation state shared by tabs, deep links (widget, App Intents) and Live Activities.
 @MainActor @Observable
 final class AppRouter {
+    /// One router for the app's scene and its App Intents.
+    static let shared = AppRouter()
+
     var tab: AppTab = .today
     var trainPath = NavigationPath()
     var labPath = NavigationPath()

@@ -92,6 +92,7 @@ struct DrillSessionView: View {
             Button("Done") { dismiss() }.buttonStyle(.borderedProminent).accessibilityIdentifier("session-done")
         }
         .panel()
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session-summary")
     }
 

@@ -7,6 +7,9 @@ import PokerTraining
 struct PokerLabWidgets: WidgetBundle {
     var body: some Widget {
         DailyDrillWidget()
+        #if canImport(ActivityKit)
+        DrillLiveActivityWidget()
+        #endif
     }
 }
 
