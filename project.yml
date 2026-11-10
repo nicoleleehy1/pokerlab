@@ -1,0 +1,108 @@
+# Generate PokerLab.xcodeproj with:  xcodegen generate
+name: PokerLab
+options:
+  bundleIdPrefix: com.nicolelee            # TODO(Nicole): change to your own reverse-DNS prefix
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    DEVELOPMENT_TEAM: ""                   # TODO(Nicole): your Apple Developer team ID
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+packages:
+  PokerEngine:
+    path: Engine
+targets:
+  PokerLab:
+    type: application
+    platform: iOS
+    sources:
+      - App/PokerLab
+      - App/Shared
+    dependencies:
+      - package: PokerEngine
+        product: PokerCore
+      - package: PokerEngine
+        product: PokerSolver
+      - package: PokerEngine
+        product: PokerTraining
+      - package: PokerEngine
+        product: CardRecognitionCore
+      - target: PokerLabWidgets
+    entitlements:
+      path: App/PokerLab/PokerLab.entitlements
+    info:
+      path: App/PokerLab/Info.plist
+      properties:
+        CFBundleDisplayName: PokerLab
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        NSCameraUsageDescription: PokerLab uses the camera to read the cards on a real table so it can show their equity.
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [remote-notification]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.nicolelee.pokerlab
+            CFBundleURLSchemes: [pokerlab]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nicolelee.PokerLab
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES
+  PokerLabWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - App/PokerLabWidgets
+      - App/Shared
+    dependencies:
+      - package: PokerEngine
+        product: PokerCore
+      - package: PokerEngine
+        product: PokerTraining
+    entitlements:
+      path: App/PokerLabWidgets/PokerLabWidgets.entitlements
+    info:
+      path: App/PokerLabWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: PokerLab Widgets
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nicolelee.PokerLab.Widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+  PokerLabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - App/PokerLabUITests
+    dependencies:
+      - target: PokerLab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nicolelee.PokerLab.UITests
+        TEST_TARGET_NAME: PokerLab
+schemes:
+  PokerLab:
+    build:
+      targets:
+        PokerLab: all
+        PokerLabUITests: [test]
+    test:
+      targets:
+        - PokerLabUITests
+    run:
+      config: Debug
