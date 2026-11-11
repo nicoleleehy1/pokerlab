@@ -131,5 +131,23 @@ struct PushFoldSolverTests {
         }
         }
     }
+
+    /// The iOS Simulator allows far fewer threads per threadgroup than a Mac GPU. Narrow
+    /// dispatches must still give the same strategies as the CPU.
+    @Test("Metal matches CPU with narrow threadgroups", arguments: [32, 64, 256])
+    func metalNarrowThreadgroups(_ cap: Int) throws {
+        guard let gpu = try? MetalCFRSolver() else { return }
+        gpu.threadCap = cap
+        let g = try gpu.solve(stacks: [10], iterations: 500, checkpointEvery: 500, kernel: .simdGroupRows)
+        let c = solver.solve(stack: 10, iterations: 500, checkpointEvery: 500)
+        var maxDiff = 0.0
+        for k in 0..<169 { maxDiff = max(maxDiff, abs(g[0].push[k] - c.push[k]), abs(g[0].call[k] - c.call[k])) }
+        #expect(maxDiff < 0.01, "cap \(cap): max strategy difference \(maxDiff)")
+        if cap < 169 {
+            #expect(throws: MetalCFRSolver.SolverError.self) {
+                try gpu.solve(stacks: [10], iterations: 10, checkpointEvery: 10, kernel: .rowPerThread)
+            }
+        }
+    }
     #endif
 }

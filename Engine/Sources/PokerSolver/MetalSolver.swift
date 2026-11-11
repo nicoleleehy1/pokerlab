@@ -14,6 +14,9 @@ public final class MetalCFRSolver: @unchecked Sendable {
     let pipelines: [Kernel: MTLComputePipelineState]
     let wBuffer: MTLBuffer, aBuffer: MTLBuffer, rowBuffer: MTLBuffer
     let matrices: PushFoldMatrices
+    /// Test hook: caps the threadgroup width below the pipeline's limit, to exercise the
+    /// narrow dispatches the iOS Simulator forces on a Mac GPU.
+    var threadCap: Int?
 
     public enum SolverError: Error { case noDevice, commandFailed(String), unsupportedThreadgroupSize(Int) }
 
@@ -29,8 +32,8 @@ public final class MetalCFRSolver: @unchecked Sendable {
         /// The threadgroup width to dispatch with on this pipeline, or nil if it cannot run.
         /// Limits vary by GPU and are much lower on the iOS Simulator, and dispatching more
         /// threads than `maxTotalThreadsPerThreadgroup` trips a Metal validation assert.
-        func threadCount(for pipeline: MTLComputePipelineState) -> Int? {
-            let limit = min(threadsPerGroup, pipeline.maxTotalThreadsPerThreadgroup)
+        func threadCount(for pipeline: MTLComputePipelineState, cap: Int? = nil) -> Int? {
+            let limit = min(threadsPerGroup, pipeline.maxTotalThreadsPerThreadgroup, cap ?? .max)
             switch self {
             case .rowPerThread:
                 // One thread per hand class: needs at least 169 threads in the group.
@@ -89,7 +92,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
                 throw SolverError.commandFailed("could not create command buffer")
             }
             let pipeline = pipelines[kernel]!
-            guard let threads = kernel.threadCount(for: pipeline) else {
+            guard let threads = kernel.threadCount(for: pipeline, cap: threadCap) else {
                 enc.endEncoding()
                 throw SolverError.unsupportedThreadgroupSize(pipeline.maxTotalThreadsPerThreadgroup)
             }

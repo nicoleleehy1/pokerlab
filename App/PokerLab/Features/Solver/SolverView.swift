@@ -14,7 +14,8 @@ struct SolverView: View {
     @State private var backend = Backend.cpu
     @State private var solution: PushFoldSolution?
     @State private var solving = false
-    @State private var errorText: String?
+    /// Where the last solve actually ran (Metal can fall back to the CPU).
+    @State private var ranOn: String?
 
     var body: some View {
         ScrollView {
@@ -49,7 +50,11 @@ struct SolverView: View {
                 .pickerStyle(.segmented)
             Picker("Backend", selection: $backend) { ForEach(Backend.allCases) { Text($0.rawValue).tag($0) } }
                 .pickerStyle(.segmented)
-            if let errorText { Text(errorText).font(.footnote).foregroundStyle(.red) }
+                .accessibilityIdentifier("solver-backend")
+            if let ranOn {
+                Text(ranOn).font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("solver-ran-on")
+            }
         }
         .panel()
         .motionAware(stack)
@@ -117,21 +122,23 @@ struct SolverView: View {
         defer { solving = false }
         let stack = self.stack
         let backend = self.backend
-        let result: PushFoldSolution? = await Task.detached(priority: .userInitiated) {
+        let (result, location): (PushFoldSolution, String) = await Task.detached(priority: .userInitiated) {
             switch backend {
             case .cpu:
-                return CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10)
+                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10), "Solved on the CPU (SIMD)")
             case .gpu:
                 // Fall back to the CPU solver if Metal is missing or rejects the dispatch
                 // (the iOS Simulator's GPU limits are lower than real hardware).
                 if let gpu = try? MetalCFRSolver(),
                    let solved = try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10).first {
-                    return solved
+                    return (solved, "Solved on the GPU (\(gpu.deviceName))")
                 }
-                return CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10)
+                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10),
+                        "Metal was unavailable, so this ran on the CPU")
             }
         }.value
         if Task.isCancelled { return }
-        if let result { solution = result; errorText = nil } else { errorText = "Metal is not available on this device." }
+        solution = result
+        ranOn = location
     }
 }
