@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PokerLab lesson question</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#18181b}a:hover{color:#52525b}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #ffffff; color: #09090b; font-family: Geist, Inter, system-ui, sans-serif; display: flex; flex-direction: column; padding: 56px 24px 32px; gap: 32px;">
+  <div style="display: flex; align-items: center; gap: 16px;">
+    <a href="Main.dc.html" aria-label="Close lesson" style="width: 44px; height: 44px; margin-left: -10px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#71717a" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </a>
+    <div style="flex-grow: 1; height: 6px; border-radius: 999px; background: #f4f4f5; overflow: hidden;">
+      <div style="width: 30%; height: 6px; border-radius: 999px; background: #09090b;"></div>
+    </div>
+    <span style="font-size: 13px; color: #71717a; font-variant-numeric: tabular-nums;">3/10</span>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 8px;">
+    <span style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #71717a;">Opening ranges</span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25;">How often does your hand win against this range?</h1>
+  </div>
+
+  <div style="border: 1px solid #e4e4e7; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-size: 13px; color: #71717a;">Your hand</span>
+      <div style="display: flex; gap: 8px;">
+        <sc-for list="{{hero}}" as="c" hint-placeholder-count="2">
+          <div style="width: 48px; height: 66px; box-sizing: border-box; border: 1px solid #e4e4e7; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+            <span style="font-size: 20px; font-weight: 600; line-height: 1; color: {{c.color}};">{{c.rank}}</span>
+            <span style="font-size: 16px; line-height: 1; color: {{c.color}};">{{c.suit}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="height: 1px; background: #f4f4f5;"></div>
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-size: 13px; color: #71717a;">Villain</span>
+      <span style="font-size: 15px; font-weight: 500;">Top 8% · UTG open</span>
+    </div>
+  </div>
+
+  <div role="radiogroup" aria-label="Equity" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+    <sc-for list="{{options}}" as="o" hint-placeholder-count="4">
+      <button type="button" role="radio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="height: 64px; border-radius: 10px; border: {{o.border}}; background: {{o.bg}}; color: #09090b; font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; cursor: pointer;">{{o.label}}</button>
+    </sc-for>
+  </div>
+
+  <div style="flex-grow: 1;"></div>
+
+  <sc-if value="{{showFeedback}}" hint-placeholder-val="{{false}}">
+    <div style="flex-shrink: 0; border: 1px solid #e4e4e7; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; background: #fafafa;">
+      <span style="font-size: 15px; font-weight: 600;">{{feedbackTitle}}</span>
+      <span style="font-size: 13px; color: #52525b; line-height: 1.5;">AJs wins 41.3% against a top 8% range. Most of that range is pairs and AK, AQ, which dominate your ace.</span>
+    </div>
+  </sc-if>
+
+  <button type="button" onClick="{{primary}}" style="height: 52px; min-height: 52px; flex-shrink: 0; border-radius: 10px; border: none; background: {{primaryBg}}; color: {{primaryInk}}; font-size: 15px; font-weight: 500; cursor: pointer;">{{primaryLabel}}</button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { picked: null, checked: false }; }
+  renderVals() {
+    const { picked, checked } = this.state;
+    const correct = '41%';
+    const labels = ['28%', '41%', '55%', '67%'];
+    const red = '#b91c1c', ink = '#09090b';
+    return {
+      hero: [{ rank: 'A', suit: '♥︎', color: red }, { rank: 'J', suit: '♥︎', color: red }],
+      options: labels.map((label) => {
+        const sel = picked === label;
+        const isRight = checked && label === correct;
+        const isWrong = checked && sel && label !== correct;
+        return {
+          label,
+          checked: sel ? 'true' : 'false',
+          border: isRight ? '2px solid #09090b' : isWrong ? '1px dashed #a1a1aa' : sel ? '2px solid #09090b' : '1px solid #e4e4e7',
+          bg: isRight ? '#f4f4f5' : '#ffffff',
+          pick: () => { if (!this.state.checked) this.setState({ picked: label }); }
+        };
+      }),
+      showFeedback: checked,
+      feedbackTitle: picked === correct ? 'Correct' : 'Close. The answer is 41%',
+      primaryLabel: checked ? 'Next question' : 'Check',
+      primaryBg: picked ? ink : '#f4f4f5',
+      primaryInk: picked ? '#fafafa' : '#a1a1aa',
+      primary: () => {
+        if (!this.state.picked) return;
+        if (this.state.checked) this.setState({ picked: null, checked: false });
+        else this.setState({ checked: true });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

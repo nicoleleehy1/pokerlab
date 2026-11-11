@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PokerLab learn path</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#18181b}a:hover{color:#52525b}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #ffffff; color: #09090b; font-family: Geist, Inter, system-ui, sans-serif; display: flex; flex-direction: column;">
+  <div style="flex-grow: 1; padding: 64px 24px 24px; display: flex; flex-direction: column; gap: 32px; overflow: hidden;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 13px; color: #71717a;">Wednesday</span>
+        <h1 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">Learn</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border: 1px solid #e4e4e7; border-radius: 999px; font-size: 14px; font-weight: 500;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3 0-5.5 1-8.5z"></path></svg>
+        <span>12 day streak</span>
+      </div>
+    </div>
+
+    <div style="border: 1px solid #e4e4e7; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; align-items: baseline; justify-content: space-between;">
+        <span style="font-size: 15px; font-weight: 500;">Daily goal</span>
+        <span style="font-size: 13px; color: #71717a; font-variant-numeric: tabular-nums;">3 of 5 drills</span>
+      </div>
+      <div style="height: 6px; border-radius: 999px; background: #f4f4f5; overflow: hidden;">
+        <div style="width: 60%; height: 6px; border-radius: 999px; background: #09090b;"></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px;">
+      <span style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #71717a;">Unit 2</span>
+      <h2 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">Preflop foundations</h2>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+      <sc-for list="{{lessons}}" as="l" hint-placeholder-count="5">
+        <div style="display: flex; gap: 16px;">
+          <div style="display: flex; flex-direction: column; align-items: center; width: 32px;">
+            <sc-if value="{{l.done}}" hint-placeholder-val="{{false}}">
+              <div style="width: 32px; height: 32px; border-radius: 999px; background: #09090b; display: flex; align-items: center; justify-content: center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+              </div>
+            </sc-if>
+            <sc-if value="{{l.current}}" hint-placeholder-val="{{false}}">
+              <div style="width: 32px; height: 32px; box-sizing: border-box; border-radius: 999px; border: 2px solid #09090b; display: flex; align-items: center; justify-content: center;">
+                <div style="width: 10px; height: 10px; border-radius: 999px; background: #09090b;"></div>
+              </div>
+            </sc-if>
+            <sc-if value="{{l.locked}}" hint-placeholder-val="{{true}}">
+              <div style="width: 32px; height: 32px; box-sizing: border-box; border-radius: 999px; border: 1px solid #e4e4e7; display: flex; align-items: center; justify-content: center;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>
+              </div>
+            </sc-if>
+            <sc-if value="{{l.line}}" hint-placeholder-val="{{true}}">
+              <div style="width: 1px; flex-grow: 1; min-height: 20px; background: #e4e4e7;"></div>
+            </sc-if>
+          </div>
+          <div style="flex-grow: 1; padding: 4px 0 24px; display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-size: 15px; font-weight: 500; color: {{l.titleColor}};">{{l.title}}</span>
+            <span style="font-size: 13px; color: #71717a;">{{l.meta}}</span>
+            <sc-if value="{{l.current}}" hint-placeholder-val="{{false}}">
+              <a href="Lesson.dc.html" style="margin-top: 12px; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 8px; background: #09090b; color: #fafafa; font-size: 14px; font-weight: 500; text-decoration: none;">Continue lesson
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fafafa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+              </a>
+            </sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <nav aria-label="Main" style="display: flex; justify-content: space-around; padding: 12px 8px 32px; border-top: 1px solid #f4f4f5;">
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; font-size: 11px; font-weight: 500; color: #09090b; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#09090b" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V5l8 4 8-4v14l-8 4-8-4z"></path></svg>Learn</a>
+    <a href="Lab.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; font-size: 11px; font-weight: 500; color: #a1a1aa; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"></path></svg>Lab</a>
+    <a href="Lesson.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; font-size: 11px; font-weight: 500; color: #a1a1aa; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg>Practice</a>
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 64px; font-size: 11px; font-weight: 500; color: #a1a1aa; text-decoration: none;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Profile</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ink = '#09090b', muted = '#a1a1aa';
+    const lessons = [
+      { title: 'Hand strength', meta: 'Completed · 96% accuracy', done: true },
+      { title: 'Position and action', meta: 'Completed · 88% accuracy', done: true },
+      { title: 'Opening ranges', meta: 'Lesson 3 of 5 · about 4 min', current: true },
+      { title: 'Pot odds', meta: '6 drills', locked: true },
+      { title: 'Push or fold at 10 bb', meta: 'Solver lesson', locked: true }
+    ];
+    return {
+      lessons: lessons.map((l, i) => ({
+        ...l,
+        done: !!l.done, current: !!l.current, locked: !!l.locked,
+        line: i < lessons.length - 1,
+        titleColor: l.locked ? muted : ink
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>
