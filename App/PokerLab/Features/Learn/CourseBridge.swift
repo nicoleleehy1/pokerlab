@@ -48,3 +48,11 @@ extension Curriculum {
         return qs.enumerated().map { LessonQuestionData($1, index: $0, topic: $1.concept.title) }
     }
 }
+
+extension Curriculum {
+    /// An adaptive review session's questions.
+    static func reviewQuestions(_ plan: [TemplateID], seed: UInt64 = .random(in: 1...UInt64.max)) async throws -> [LessonQuestionData] {
+        let qs = try await questions(plan: plan, seed: seed)
+        return qs.enumerated().map { LessonQuestionData($1, index: $0, topic: $1.concept.title) }
+    }
+}

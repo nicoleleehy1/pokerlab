@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import Charts
 import PokerTraining
+import PokerCourse
 
 /// Profile tab: totals, accuracy over time, leaks, past sessions and settings.
 struct ProfileView: View {
@@ -9,6 +10,19 @@ struct ProfileView: View {
     @Query(sort: \TrainingSession.startedAt, order: .reverse) private var sessions: [TrainingSession]
     @Query private var attempts: [DrillAttempt]
     @State private var summary = ProgressSummary()
+    @Query(sort: \PlayerProfile.createdAt) private var profiles: [PlayerProfile]
+    @Query private var lessons: [LessonResult]
+
+    /// Streak and totals include course lessons as well as drills.
+    private var course: CourseProgress {
+        CourseProgress(records: lessons.map(\.record), extraActiveDays: Set(attempts.map { DailyDrill.dayNumber(for: $0.date) }),
+                       today: DailyDrill.dayNumber())
+    }
+    private var spotsAnswered: Int { summary.totalAttempts + lessons.reduce(0) { $0 + $1.total } }
+    private var overallAccuracy: Double? {
+        let correct = Double(summary.totalAttempts) * summary.accuracy + Double(lessons.reduce(0) { $0 + $1.correct })
+        return spotsAnswered == 0 ? nil : correct / Double(spotsAnswered)
+    }
 
     var body: some View {
         NavigationStack {
@@ -16,12 +30,13 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     ScreenHeader(title: "Profile")
                     HStack(spacing: 12) {
-                        StatTile(title: "Day streak", value: "\(summary.dailyStreak)")
-                        StatTile(title: "Spots answered", value: "\(summary.totalAttempts)")
-                        StatTile(title: "Accuracy", value: summary.totalAttempts == 0 ? "–" : Theme.percent(summary.accuracy, digits: 0))
+                        StatTile(title: "Day streak", value: "\(course.streak)")
+                        StatTile(title: "Spots answered", value: "\(spotsAnswered)")
+                        StatTile(title: "Accuracy", value: overallAccuracy.map { Theme.percent($0, digits: 0) } ?? "–")
                     }
+                    MasteryCard(state: profiles.first?.adaptive ?? AdaptiveState())
                     if summary.totalAttempts == 0 {
-                        Text("Finish a lesson or drill and your accuracy shows up here.")
+                        Text("Finish a drill and your accuracy over time shows up here.")
                             .font(Theme.caption).foregroundStyle(Theme.muted)
                     } else {
                         accuracyChart

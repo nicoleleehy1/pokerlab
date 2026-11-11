@@ -217,3 +217,17 @@ BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: hands 536/335 (canonical 536/335), 24 dec
   isomorphic solve matches the full solve; EVs are zero-sum; sets never fold.
 - In the simulator's Debug build the BB-vs-BTN solve took about 5.5 s. Debug builds the
   engine without optimisation, so that figure is not a performance number.
+
+## Adaptive layer (FSRS + per-concept Elo): simulated check only
+
+From `swift test` (`eloBeatsConstantBaselineOnHeldOutAnswers`), a simulated learner with
+random per-concept skills and per-template difficulties answering 3,000 questions; Elo
+predictions are made online before each answer and scored on the later half:
+
+```
+Simulated learner, held-out half: Elo log loss 0.5623075698742775, constant baseline 0.6597253645068445, AUC 0.742992119279123
+```
+
+This only shows the model learns what the simulation builds in. The research doc's real
+metric (next-answer AUC and log loss on a past-to-future split of real review logs) needs
+real usage data and has not been measured.

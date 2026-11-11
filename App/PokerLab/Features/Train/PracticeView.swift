@@ -17,6 +17,7 @@ struct PracticeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     ScreenHeader(title: "Practice")
+                    ReviewCard()
                     dailyCard
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Drills").eyebrowStyle()

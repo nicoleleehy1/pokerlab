@@ -88,12 +88,33 @@ final class PlayerProfile {
     var bestStreak: Int = 0
     /// Encoded `SkillScheduler` (spaced-repetition state).
     var schedulerData: Data?
+    /// Encoded `AdaptiveState` (FSRS per template, Elo per concept) for the course.
+    var adaptiveData: Data?
 
     init() {}
 
     var scheduler: SkillScheduler {
         get { schedulerData.flatMap { try? JSONDecoder().decode(SkillScheduler.self, from: $0) } ?? SkillScheduler() }
         set { schedulerData = try? JSONEncoder().encode(newValue) }
+    }
+
+    var adaptive: AdaptiveState {
+        get { adaptiveData.flatMap { try? JSONDecoder().decode(AdaptiveState.self, from: $0) } ?? AdaptiveState() }
+        set { adaptiveData = try? JSONEncoder().encode(newValue) }
+    }
+
+    /// Adaptive-layer clock: fractional days.
+    static func adaptiveNow(_ date: Date = .now) -> Double { date.timeIntervalSinceReferenceDate / 86_400 }
+
+    /// Feeds a finished lesson's answers to FSRS and Elo.
+    func recordAdaptive(_ outcome: LessonOutcome) {
+        var state = adaptive
+        let now = Self.adaptiveNow()
+        for (i, id) in outcome.templateIDs.enumerated() {
+            guard let id, let t = TemplateID(rawValue: id) else { continue }
+            state.record(t, lossFraction: outcome.lossFractions[i], seconds: outcome.durations[i], at: now)
+        }
+        adaptive = state
     }
 
     /// Profiles can be duplicated across devices before the first sync (no unique constraints in

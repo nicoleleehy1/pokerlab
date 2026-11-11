@@ -66,3 +66,34 @@ final class LearnFlowUITests: XCTestCase {
         snapshot("profile")
     }
 }
+
+@MainActor
+final class ReviewFlowUITests: XCTestCase {
+    /// After one lesson, adaptive review is available and records mastery on Profile.
+    func testReviewAfterLesson() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        func element(_ id: String) -> XCUIElement { app.descendants(matching: .any).matching(identifier: id).firstMatch }
+        app.tabBars.buttons["Practice"].tap()
+        XCTAssertTrue(element("start-review").waitForExistence(timeout: 10))
+        element("start-review").tap()
+        XCTAssertTrue(element("answer-0").waitForExistence(timeout: 60), "review did not load")
+        for i in 0..<10 {
+            element("answer-0").tap()
+            element("lesson-primary").tap()
+            XCTAssertTrue(element("lesson-feedback").waitForExistence(timeout: 10), "no feedback on question \(i + 1)")
+            element("lesson-primary").tap()
+            if element("lesson-summary").waitForExistence(timeout: 2) { break }
+            XCTAssertTrue(element("answer-0").waitForExistence(timeout: 30), "question \(i + 2) missing: \(app.debugDescription.prefix(3000))")
+        }
+        XCTAssertTrue(element("lesson-summary").exists)
+        element("lesson-done").tap()
+        app.tabBars.buttons["Profile"].tap()
+        XCTAssertTrue(app.staticTexts["Concept mastery"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Answer a few course questions to see your mastery per concept."].exists)
+        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("profile-mastery.png"))
+        }
+    }
+}

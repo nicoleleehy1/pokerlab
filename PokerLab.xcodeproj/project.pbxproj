@@ -14,6 +14,7 @@
 		13D22141BAE45B09599F2103 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37C1E877BA50B801D1E7025 /* Theme.swift */; };
 		16439F526EF079E07D84C18F /* CameraScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D5C7709211B2C47F4FE8EF /* CameraScanView.swift */; };
 		1D9C80A82A77CBB8855E6215 /* LiveActivityController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC39D0DF067E39796836B1DD /* LiveActivityController.swift */; };
+		24FC7F1EB0546847F170A01F /* ReviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA911C92E7DB82918B8C1D38 /* ReviewCard.swift */; };
 		2E091CCF1B6E65BFAC68B9DA /* PokerLabWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = ACCFCEE8FE594EAFBD892B1E /* PokerLabWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5E51DCF917E6E12D055F38 /* SettingsView.swift */; };
 		3A8B40BED11753689C3045D1 /* PokerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 83BADCE3B31CF4C4503CFFF5 /* PokerCore */; };
@@ -120,6 +121,7 @@
 		B422DC131F361B937B2FA582 /* PokerLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokerLabApp.swift; sourceTree = "<group>"; };
 		B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToyGameLabView.swift; sourceTree = "<group>"; };
 		BB263A623D176A2984ACED83 /* EquityLabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquityLabModel.swift; sourceTree = "<group>"; };
+		CA911C92E7DB82918B8C1D38 /* ReviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewCard.swift; sourceTree = "<group>"; };
 		CECA0AA7A4B0E79A454CA972 /* DrillActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillActivityAttributes.swift; sourceTree = "<group>"; };
 		CF906A46BA1B52C73ED3AB47 /* SolverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolverView.swift; sourceTree = "<group>"; };
 		D37C1E877BA50B801D1E7025 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -317,6 +319,7 @@
 				FA7A5DC7F6AAA35D11F987C8 /* DrillSessionModel.swift */,
 				14FE49A9E1509F96AFE85025 /* DrillSessionView.swift */,
 				812622AA395B79754E3D0898 /* PracticeView.swift */,
+				CA911C92E7DB82918B8C1D38 /* ReviewCard.swift */,
 			);
 			path = Train;
 			sourceTree = "<group>";
@@ -534,6 +537,7 @@
 				EC4BA623875AD3C4DD40E522 /* ProfileView.swift in Sources */,
 				08FCBD24230C0CAE03AC1DC9 /* ProgressAggregator.swift in Sources */,
 				B310ED86ECC1866AE872FB65 /* RangeGridView.swift in Sources */,
+				24FC7F1EB0546847F170A01F /* ReviewCard.swift in Sources */,
 				0373F5FBC6A0A15F5F2520BD /* RiverSolverView.swift in Sources */,
 				31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */,
 				82C33BFE5E6B5BB59634C5A8 /* SolverView.swift in Sources */,

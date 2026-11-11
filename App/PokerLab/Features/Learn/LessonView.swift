@@ -48,6 +48,9 @@ struct LessonOutcome: Sendable {
     let choices: [Int]
     /// EV loss per answer as a fraction of the pot.
     let lossFractions: [Double]
+    /// Template of each question and seconds taken to answer it (for the adaptive layer).
+    let templateIDs: [String?]
+    let durations: [Double]
     var meanLossFraction: Double { lossFractions.isEmpty ? 0 : lossFractions.reduce(0, +) / Double(lossFractions.count) }
 }
 
@@ -61,6 +64,8 @@ final class LessonRunner {
     private(set) var checked = false
     private(set) var choices: [Int] = []
     private(set) var loadError: String?
+    private(set) var durations: [Double] = []
+    private var shownAt = Date.now
     var isLoaded: Bool { !questions.isEmpty }
     var isFinished: Bool { isLoaded && choices.count == questions.count && !checked }
 
@@ -74,6 +79,7 @@ final class LessonRunner {
     func start() async {
         guard questions.isEmpty else { return }
         do { questions = try await load() } catch { loadError = error.localizedDescription }
+        shownAt = .now
     }
 
     var current: LessonQuestionData? { index < questions.count ? questions[index] : nil }
@@ -86,6 +92,7 @@ final class LessonRunner {
         guard let picked, !checked else { return }
         checked = true
         choices.append(picked)
+        durations.append(Date.now.timeIntervalSince(shownAt))
     }
 
     func next() {
@@ -93,11 +100,13 @@ final class LessonRunner {
         checked = false
         picked = nil
         if index < questions.count - 1 { index += 1 }
+        shownAt = .now
     }
 
     var outcome: LessonOutcome {
         let losses = zip(questions, choices).map { q, c in c < q.lossFractions.count ? q.lossFractions[c] : (q.correct.contains(c) ? 0 : 1) }
-        return LessonOutcome(correct: correctCount, total: questions.count, choices: choices, lossFractions: losses)
+        return LessonOutcome(correct: correctCount, total: questions.count, choices: choices, lossFractions: losses,
+                             templateIDs: questions.prefix(choices.count).map(\.templateID), durations: durations)
     }
 }
 

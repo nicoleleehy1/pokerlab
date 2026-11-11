@@ -113,6 +113,22 @@ public enum Curriculum {
 
     public static func lesson(_ id: String) -> Lesson? { lessons.first { $0.id == id } }
 
+    /// Generates one question per template in `plan` (an adaptive review session).
+    public static func questions(plan: [TemplateID], seed: UInt64) async throws -> [Question] {
+        var out: [Question] = []
+        for (i, t) in plan.enumerated() { out.append(try await t.generate(seed: seed &+ UInt64(i) &* 0x9E37_79B9_7F4A_7C15)) }
+        return out
+    }
+
+    /// Templates the learner has reached: every lesson that is done or current.
+    public static func unlockedTemplates(_ progress: CourseProgress) -> [TemplateID] {
+        var seen: [TemplateID] = []
+        for item in progress.path() where item.status != .locked {
+            for t in item.lesson.templates where !seen.contains(t) { seen.append(t) }
+        }
+        return seen
+    }
+
     /// Generates a lesson's questions. Deterministic for a given seed.
     public static func questions(for lesson: Lesson, seed: UInt64) async throws -> [Question] {
         var out: [Question] = []

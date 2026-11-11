@@ -79,6 +79,7 @@ struct LearnView: View {
         guard outcome.total > 0 else { return }
         context.insert(LessonResult(lessonID: lesson.id, correct: outcome.correct, total: outcome.total,
                                     meanLossFraction: outcome.meanLossFraction))
+        PlayerProfile.current(in: context).recordAdaptive(outcome)
         try? context.save()
         selectedUnit = nil
     }
