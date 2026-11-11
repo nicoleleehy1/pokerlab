@@ -16,6 +16,7 @@
 		2E091CCF1B6E65BFAC68B9DA /* PokerLabWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = ACCFCEE8FE594EAFBD892B1E /* PokerLabWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5E51DCF917E6E12D055F38 /* SettingsView.swift */; };
 		3A8B40BED11753689C3045D1 /* PokerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 83BADCE3B31CF4C4503CFFF5 /* PokerCore */; };
+		3A94AF286D9B7F3254AB58C4 /* ToyGameLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */; };
 		476D243B3791B9CF6A0810C6 /* PokerSolver in Frameworks */ = {isa = PBXBuildFile; productRef = CF13FEE731E2203F003F02DB /* PokerSolver */; };
 		49965C0515D9BFBCE131FB43 /* DrillFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB88B8AFD259E86F24EF8ED /* DrillFlowUITests.swift */; };
 		54B85E56B8C924DEE917F7F8 /* SolverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BDC21D1EE1E8653F19D826C /* SolverUITests.swift */; };
@@ -115,6 +116,7 @@
 		AC39D0DF067E39796836B1DD /* LiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityController.swift; sourceTree = "<group>"; };
 		ACCFCEE8FE594EAFBD892B1E /* PokerLabWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PokerLabWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B422DC131F361B937B2FA582 /* PokerLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokerLabApp.swift; sourceTree = "<group>"; };
+		B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToyGameLabView.swift; sourceTree = "<group>"; };
 		BB263A623D176A2984ACED83 /* EquityLabModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquityLabModel.swift; sourceTree = "<group>"; };
 		CECA0AA7A4B0E79A454CA972 /* DrillActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillActivityAttributes.swift; sourceTree = "<group>"; };
 		CF906A46BA1B52C73ED3AB47 /* SolverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SolverView.swift; sourceTree = "<group>"; };
@@ -167,6 +169,7 @@
 			children = (
 				BB263A623D176A2984ACED83 /* EquityLabModel.swift */,
 				7B848C861C60446F54668545 /* EquityLabView.swift */,
+				B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */,
 			);
 			path = Lab;
 			sourceTree = "<group>";
@@ -531,6 +534,7 @@
 				31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */,
 				82C33BFE5E6B5BB59634C5A8 /* SolverView.swift in Sources */,
 				13D22141BAE45B09599F2103 /* Theme.swift in Sources */,
+				3A94AF286D9B7F3254AB58C4 /* ToyGameLabView.swift in Sources */,
 				5C8EBA8BA9DA3B59A9BF41C2 /* WidgetBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

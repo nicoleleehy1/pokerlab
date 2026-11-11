@@ -53,6 +53,7 @@ struct PracticeView: View {
                 case .drill(let kind): DrillSessionView(kind: kind)
                 case .dailyDrill: DrillSessionView(kind: .equityQuiz, isDaily: true)
                 case .solver: SolverView()
+                case .toyGames: ToyGameLabView()
                 case .camera: CameraScanView()
                 case .settings: SettingsView()
                 }

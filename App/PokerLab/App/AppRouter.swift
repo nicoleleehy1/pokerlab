@@ -29,6 +29,7 @@ final class AppRouter {
         case drill(DrillKind)
         case dailyDrill
         case solver
+        case toyGames
         case camera
         case settings
     }
@@ -39,7 +40,7 @@ final class AppRouter {
             tab = .practice
             practicePath = NavigationPath()
             practicePath.append(destination)
-        case .solver, .camera:
+        case .solver, .camera, .toyGames:
             tab = .lab
             labPath = NavigationPath()
             labPath.append(destination)
@@ -56,6 +57,7 @@ final class AppRouter {
             if let kind = DrillKind(rawValue: url.lastPathComponent) { open(.drill(kind)) }
         case "daily": open(.dailyDrill)
         case "solver": open(.solver)
+        case "toys": open(.toyGames)
         case "camera": open(.camera)
         case "lab": tab = .lab
         case "learn": tab = .learn

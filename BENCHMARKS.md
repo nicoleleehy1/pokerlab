@@ -119,3 +119,24 @@ test suite; AA vs KK averages to 81.95%.
 | CPU: scalar loops -> SIMD16 fused matrix-vector + vectorised regret updates (1 thread) | 2,328 ms | 517 ms |
 | CPU: SIMD16, one task per stack depth (11 tasks) | 517 ms | 88 ms |
 | Metal: v1 row-per-thread -> v2 SIMD-group rows with `simd_sum` | 203 ms | 79 ms |
+
+## Toy games: CFR on Kuhn poker
+
+`swift run -c release PokerBench toy`:
+
+```
+Toy games (Kuhn poker, target |value + 1/18| < 1e-4 and exploitability < 1e-4)
+CFR                   : 7390 iterations, 34.75 ms solve time (excluding checks)
+CFR+                  : 360 iterations, 1.31 ms solve time (excluding checks)
+DCFR (1.5, 0, 2)      : 910 iterations, 3.11 ms solve time (excluding checks)
+```
+
+- Tabular CFR with alternating updates over the full Kuhn tree (12 infosets, 24 actions).
+  Exploitability is an exact best response, checked every 10 iterations (not timed), so
+  iteration counts are rounded up to the next multiple of 10.
+- On this tiny game CFR+ needs fewer iterations than DCFR. DCFR's advantage reported by
+  Brown & Sandholm shows up on poker trees with large mistakes (see the push/fold and river
+  sections), not necessarily on Kuhn.
+- The test suite checks all three variants reach the value -1/18 and exploitability below
+  1e-3 after 20,000 iterations, and the clairvoyance game matches its closed form
+  (value (1 + 2s) / (2 (1 + s)), bluff s/(1+s), call 1/(1+s)) for s = 0.5, 1, 2.

@@ -13,6 +13,7 @@ struct LabTab: View {
                 .navigationDestination(for: AppRouter.Destination.self) { d in
                     switch d {
                     case .solver: SolverView()
+                    case .toyGames: ToyGameLabView()
                     case .camera: CameraScanView()
                     default: EmptyView()
                     }
@@ -278,6 +279,11 @@ struct EquityLabView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier("tool-solver")
+                NavigationLink(value: AppRouter.Destination.toyGames) {
+                    ListRow(symbol: "chart.line.downtrend.xyaxis", title: "Toy games", subtitle: "Watch CFR solve Kuhn poker live")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tool-toys")
                 NavigationLink(value: AppRouter.Destination.camera) {
                     ListRow(symbol: "camera.viewfinder", title: "Scan a Table", subtitle: "Read real cards with the camera")
                 }

@@ -29,6 +29,7 @@ let mode = CommandLine.arguments.dropFirst().first ?? "all"
 var checksum: UInt64 = 0
 if mode == "core" || mode == "all" { try await runCore() }
 if mode == "solver" || mode == "all" { try await runSolver() }
+if mode == "toy" || mode == "all" { runToy() }
 print("")
 print("checksum \(checksum)")
 
@@ -187,4 +188,31 @@ for target in [0.005, 0.001] {
     print("10 bb exploitability (mbb/hand) at iterations " + marks.map { "\($0): \(fmt(curve.curve[$0 - 1].exploitability, 3))" }.joined(separator: ", "))
     let ten = curve
     print("10 bb Nash: shove \(fmt(ten.pushFraction * 100, 1))% of hands, call \(fmt(ten.callFraction * 100, 1))%")
+}
+
+/// Kuhn poker: wall time and iterations until the average strategy's value is within 1e-4 of
+/// -1/18 and its exploitability below 1e-4 chips/hand, per CFR variant.
+func runToy() {
+    print("\nToy games (Kuhn poker, target |value + 1/18| < 1e-4 and exploitability < 1e-4)")
+    for variant in [ToyCFR.Variant.vanilla, .cfrPlus, .dcfrDefault] {
+        var cfr = ToyCFR(game: .kuhn, variant: variant)
+        let clock = ContinuousClock()
+        var solve = Duration.zero
+        var reached: Int?
+        while cfr.iteration < 200_000 {
+            let t0 = clock.now
+            cfr.run(iterations: 10)
+            solve += clock.now - t0
+            let avg = cfr.average
+            if abs(ToyGame.kuhn.value(avg) - ToyGame.kuhnValue) < 1e-4 && ToyGame.kuhn.exploitability(avg) < 1e-4 {
+                reached = cfr.iteration; break
+            }
+        }
+        let name = variant.name.padding(toLength: 22, withPad: " ", startingAt: 0)
+        if let reached {
+            print("\(name): \(reached) iterations, \(fmt(seconds(solve) * 1000, 2)) ms solve time (excluding checks)")
+        } else {
+            print("\(name): not reached in 200,000 iterations")
+        }
+    }
 }

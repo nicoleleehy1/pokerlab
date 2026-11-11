@@ -34,3 +34,24 @@ final class SolverUITests: XCTestCase {
         XCTAssertEqual(app.state, .runningForeground)
     }
 }
+
+@MainActor
+final class ToyGameUITests: XCTestCase {
+    func testKuhnLabSolves() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        app.tabBars.buttons["Lab"].tap()
+        let link = app.descendants(matching: .any).matching(identifier: "tool-toys").firstMatch
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        app.swipeUp()
+        link.tap()
+        let chart = app.descendants(matching: .any).matching(identifier: "toy-chart").firstMatch
+        XCTAssertTrue(chart.waitForExistence(timeout: 10))
+        let iterations = app.staticTexts["5000"]
+        XCTAssertTrue(iterations.waitForExistence(timeout: 60), "solve did not reach 5,000 iterations: \(chart.debugDescription)")
+        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("toys.png"))
+        }
+    }
+}
