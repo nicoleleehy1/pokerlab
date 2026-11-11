@@ -31,6 +31,8 @@ final class ToyGameLabModel {
     private(set) var isRunning = false
     private(set) var solvedGame: ToyGame?
     private var task: Task<Void, Never>?
+    /// Incremented on every solve so results from a cancelled, still-running task are dropped.
+    private var generation = 0
 
     var game: ToyGame { gameChoice == .kuhn ? .kuhn : .clairvoyance(bet: betSize) }
     var theoryValue: Double { gameChoice == .kuhn ? ToyGame.kuhnValue : ToyGame.clairvoyanceValue(bet: betSize) }
@@ -40,6 +42,8 @@ final class ToyGameLabModel {
     /// visibly converges (the solve time shown excludes those pauses).
     func solve(animated: Bool) {
         task?.cancel()
+        generation += 1
+        let token = generation
         points = []; strategy = []; value = nil; solveMilliseconds = 0
         let game = self.game, variant = algorithm.variant
         solvedGame = game
@@ -56,18 +60,23 @@ final class ToyGameLabModel {
                 let avg = cfr.average
                 let point = Point(iteration: cfr.iteration, exploitability: game.exploitability(avg))
                 let value = game.value(avg), ms = Double(solve.components.attoseconds) * 1e-15 + Double(solve.components.seconds) * 1000
-                await self?.publish(point, strategy: avg, value: value, ms: ms)
+                await self?.publish(point, strategy: avg, value: value, ms: ms, token: token)
                 next = min(Self.iterations, max(next + 1, Int(Double(next) * 1.25)))
                 if animated { try? await Task.sleep(for: .milliseconds(25)) }
             }
-            await self?.finish()
+            await self?.finish(token: token)
         }
     }
 
-    private func publish(_ p: Point, strategy: [Double], value: Double, ms: Double) {
+    private func publish(_ p: Point, strategy: [Double], value: Double, ms: Double, token: Int) {
+        guard token == generation else { return } // a newer solve has started
         points.append(p); self.strategy = strategy; self.value = value; solveMilliseconds = ms
     }
-    private func finish() { isRunning = false }
+    private func finish(token: Int) { if token == generation { isRunning = false } }
+
+    /// Average-strategy probability for one action, or nil while the stored strategy
+    /// belongs to a different game than the one being drawn.
+    func probability(_ index: Int) -> Double? { strategy.indices.contains(index) ? strategy[index] : nil }
 }
 
 struct ToyGameLabView: View {
@@ -83,7 +92,7 @@ struct ToyGameLabView: View {
                     .font(Theme.caption).foregroundStyle(Theme.muted)
                 controls
                 resultCard
-                if let game = model.solvedGame, !model.strategy.isEmpty { strategyCard(game) }
+                if let game = model.solvedGame, model.strategy.count == game.infosets.reduce(0, { $0 + $1.actions.count }) { strategyCard(game) }
             }
             .screenPadding()
             .padding(.vertical, 16)
@@ -173,7 +182,7 @@ struct ToyGameLabView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(set.name).font(Theme.caption).foregroundStyle(set.player == 0 ? Theme.ink : Theme.muted)
                     Spacer(minLength: 12)
-                    Text(set.actions.indices.map { "\(set.actions[$0]) \(Theme.percent(model.strategy[set.offset + $0], digits: 0))" }.joined(separator: " · "))
+                    Text(set.actions.indices.map { "\(set.actions[$0]) \(model.probability(set.offset + $0).map { Theme.percent($0, digits: 0) } ?? "–")" }.joined(separator: " · "))
                         .font(Theme.smallNumber)
                         .multilineTextAlignment(.trailing)
                 }
