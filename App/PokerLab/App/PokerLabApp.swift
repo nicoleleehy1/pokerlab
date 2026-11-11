@@ -16,6 +16,7 @@ struct PokerLabApp: App {
     let container: ModelContainer
 
     init() {
+        TabBarAppearance.apply()
         let schema = Schema(PokerLabSchema.models)
         let config: ModelConfiguration
         if AppConfig.isUITesting {

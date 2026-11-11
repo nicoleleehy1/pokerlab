@@ -3,7 +3,8 @@ import SwiftData
 import Charts
 import PokerTraining
 
-struct ProgressScreen: View {
+/// Profile tab: totals, accuracy over time, leaks, past sessions and settings.
+struct ProfileView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \TrainingSession.startedAt, order: .reverse) private var sessions: [TrainingSession]
     @Query private var attempts: [DrillAttempt]
@@ -12,26 +13,37 @@ struct ProgressScreen: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
+                    ScreenHeader(title: "Profile")
+                    HStack(spacing: 12) {
+                        StatTile(title: "Day streak", value: "\(summary.dailyStreak)")
+                        StatTile(title: "Spots answered", value: "\(summary.totalAttempts)")
+                        StatTile(title: "Accuracy", value: summary.totalAttempts == 0 ? "–" : Theme.percent(summary.accuracy, digits: 0))
+                    }
                     if summary.totalAttempts == 0 {
-                        ContentUnavailableView("No drills yet", systemImage: "chart.line.uptrend.xyaxis",
-                                               description: Text("Finish a drill and your accuracy shows up here."))
+                        Text("Finish a lesson or drill and your accuracy shows up here.")
+                            .font(Theme.caption).foregroundStyle(Theme.muted)
                     } else {
-                        HStack(spacing: 12) {
-                            StatTile(title: "Spots answered", value: "\(summary.totalAttempts)", symbol: "square.stack", tint: Theme.hero)
-                            StatTile(title: "Accuracy", value: Theme.percent(summary.accuracy, digits: 0), symbol: "scope", tint: .green)
-                            StatTile(title: "Day streak", value: "\(summary.dailyStreak)", symbol: "flame.fill", tint: .orange)
-                        }
                         accuracyChart
                         leaksChart
                         sessionList
                     }
+                    RowGroup {
+                        NavigationLink(value: ProfileDestination.settings) {
+                            ListRow(symbol: "gearshape", title: "Settings", subtitle: "Deck colours, sync, export")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("settings-button")
+                    }
                 }
-                .padding()
+                .screenPadding()
+                .padding(.top, 16)
+                .padding(.bottom, 24)
             }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("Progress")
+            .background(Theme.background)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: TrainingSession.self) { SessionDetailView(session: $0) }
+            .navigationDestination(for: ProfileDestination.self) { _ in SettingsView() }
             .task(id: attempts.count) { await refresh() }
         }
     }
@@ -43,10 +55,10 @@ struct ProgressScreen: View {
 
     private var accuracyChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Accuracy, last 30 days").font(.headline)
+            Text("Accuracy, last 30 days").font(Theme.label)
             Chart(summary.days) { d in
                 BarMark(x: .value("Day", d.day, unit: .day), y: .value("Accuracy", d.accuracy))
-                    .foregroundStyle(Theme.hero.gradient)
+                    .foregroundStyle(Theme.ink)
                     .accessibilityLabel(d.day.formatted(date: .abbreviated, time: .omitted))
                     .accessibilityValue("\(Theme.percent(d.accuracy, digits: 0)) of \(d.attempts) spots")
             }
@@ -59,13 +71,13 @@ struct ProgressScreen: View {
 
     private var leaksChart: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Leaks by category").font(.headline)
-            Text("Weakest first. These come up more often in drills.").font(.footnote).foregroundStyle(.secondary)
+            Text("Leaks by category").font(Theme.label)
+            Text("Weakest first. These come up more often in drills.").font(Theme.caption).foregroundStyle(Theme.muted)
             Chart(summary.categories) { c in
                 BarMark(x: .value("Accuracy", c.accuracy), y: .value("Category", c.category.title))
-                    .foregroundStyle(c.accuracy < 0.6 ? Color.orange : Theme.hero)
+                    .foregroundStyle(c.accuracy < 0.6 ? Theme.faint : Theme.ink)
                     .annotation(position: .trailing) {
-                        Text(Theme.percent(c.accuracy, digits: 0)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                        Text(Theme.percent(c.accuracy, digits: 0)).font(.caption2.monospacedDigit()).foregroundStyle(Theme.muted)
                     }
             }
             .chartXScale(domain: 0...1)
@@ -77,17 +89,17 @@ struct ProgressScreen: View {
 
     private var sessionList: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Sessions").font(.headline).padding(.bottom, 6)
+            Text("Sessions").font(Theme.label).padding(.bottom, 6)
             ForEach(sessions.prefix(20)) { s in
                 NavigationLink(value: s) {
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(s.mode.title).font(.subheadline.weight(.medium))
-                            Text(s.startedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+                            Text(s.mode.title).font(Theme.label)
+                            Text(s.startedAt.formatted(date: .abbreviated, time: .shortened)).font(Theme.caption).foregroundStyle(Theme.muted)
                         }
                         Spacer()
                         Text("\(s.correctCount)/\(s.attemptCount)").font(Theme.smallNumber)
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.faint)
                     }
                     .padding(.vertical, 6)
                     .contentShape(Rectangle())
@@ -98,6 +110,8 @@ struct ProgressScreen: View {
         .panel()
     }
 }
+
+enum ProfileDestination: Hashable { case settings }
 
 struct SessionDetailView: View {
     let session: TrainingSession
@@ -113,8 +127,8 @@ struct SessionDetailView: View {
                 ForEach(session.sortedAttempts) { a in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Image(systemName: a.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(a.isCorrect ? .green : .orange)
+                            Image(systemName: a.isCorrect ? "checkmark.circle" : "xmark.circle")
+                                .foregroundStyle(a.isCorrect ? Theme.ink : Theme.muted)
                             Text(a.spotSummary).font(.subheadline)
                         }
                         Text(detail(a)).font(.caption).foregroundStyle(.secondary)

@@ -32,7 +32,7 @@ struct SolverView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Theme.background)
         .navigationTitle("Push/Fold Solver")
         .task(id: "\(stack)-\(backend)") { await solve() }
     }

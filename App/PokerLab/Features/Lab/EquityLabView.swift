@@ -21,28 +21,39 @@ struct LabTab: View {
     }
 }
 
+/// Equity Lab from docs/design/Lab.dc.html: two hand rows with large tabular percentages, a
+/// win/tie/lose bar, five dashed board slots, and the convergence chart behind "Show the math".
 struct EquityLabView: View {
     @Environment(AppRouter.self) private var router
     @State private var model = EquityLabModel()
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showMath = false
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                handsPanel
-                boardPanel
-                resultPanel
-                if model.convergence.count > 1 { convergencePanel }
-                toolsPanel
+            VStack(alignment: .leading, spacing: 28) {
+                ScreenHeader(title: "Lab") {
+                    Button { model.clear() } label: {
+                        Label("Reset", systemImage: "arrow.counterclockwise").labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(.outline)
+                    .disabled(model.usedCards.isEmpty)
+                    .accessibilityIdentifier("lab-reset")
+                }
+                VStack(spacing: 12) {
+                    heroRow
+                    villainRow
+                }
+                resultBar
+                boardSlots
+                mathDisclosure
+                tools
             }
-            .padding()
+            .screenPadding()
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle("Equity Lab")
-        .toolbar {
-            Button("Clear", systemImage: "arrow.counterclockwise") { model.clear() }
-                .disabled(model.usedCards.isEmpty)
-        }
+        .background(Theme.background)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $model.pickerSlot) { slot in
             CardPickerSheet(title: slot.title, used: model.usedCards, current: model.card(at: slot)) { card in
                 model.set(card, at: slot)
@@ -57,113 +68,197 @@ struct EquityLabView: View {
         }
     }
 
-    private var handsPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("You").font(.headline).foregroundStyle(Theme.hero)
-            CardSlotsRow(cards: model.hero, label: "Your") { model.pickerSlot = .hero($0) }
-            Divider()
-            HStack {
-                Text("Villain").font(.headline).foregroundStyle(Theme.villain)
-                Spacer()
-                Picker("Villain", selection: $model.villainMode) {
-                    ForEach(EquityLabModel.VillainMode.allCases) { Text($0.rawValue).tag($0) }
+    // MARK: Hand rows
+
+    private var heroRow: some View {
+        handRow(label: "You", description: describe(model.hero), equity: model.snapshot?.equities[0], muted: false) {
+            CardSlotsRow(cards: model.hero, label: "Your", baseWidth: 40) { model.pickerSlot = .hero($0) }
+        }
+        .panel(padding: 16)
+        .accessibilityIdentifier("hero-row")
+    }
+
+    private var villainRow: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            handRow(label: "Villain", description: villainDescription, equity: model.snapshot?.equities[1], muted: true) {
+                if model.villainMode == .hand {
+                    CardSlotsRow(cards: model.villain, label: "Villain", baseWidth: 40) { model.pickerSlot = .villain($0) }
+                } else {
+                    Image(systemName: "square.grid.3x3")
+                        .font(.title3)
+                        .foregroundStyle(Theme.muted)
+                        .frame(width: 86, height: 55)
+                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Theme.border, lineWidth: 1))
+                        .accessibilityHidden(true)
                 }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .onChange(of: model.villainMode) { model.recompute() }
             }
-            if model.villainMode == .hand {
-                CardSlotsRow(cards: model.villain, label: "Villain") { model.pickerSlot = .villain($0) }
-            } else {
-                TextField("Range, e.g. AKs, QQ+, A5s-A2s", text: $model.villainRangeText)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .font(.system(.body, design: .monospaced))
-                    .padding(10)
-                    .background(Color(.tertiarySystemFill), in: .rect(cornerRadius: 8))
-                    .onSubmit { model.recompute() }
-                    .accessibilityIdentifier("villain-range-field")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(NamedRange.presets, id: \.name) { preset in
-                            Button(preset.name) { model.villainRangeText = preset.notation; model.recompute() }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                        }
-                    }
-                }
-                if let error = model.rangeError {
-                    Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.red)
+            Picker("Villain holds", selection: $model.villainMode) {
+                ForEach(EquityLabModel.VillainMode.allCases) { Text($0 == .hand ? "Exact hand" : "Range").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: model.villainMode) { model.recompute() }
+            if model.villainMode == .range { rangeEditor }
+        }
+        .panel(padding: 16)
+    }
+
+    @ViewBuilder private var rangeEditor: some View {
+        TextField("Range, e.g. AKs, QQ+, A5s-A2s", text: $model.villainRangeText)
+            .textInputAutocapitalization(.characters)
+            .autocorrectionDisabled()
+            .font(.system(.subheadline, design: .monospaced))
+            .padding(.horizontal, 12)
+            .frame(minHeight: 40)
+            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border, lineWidth: 1))
+            .onSubmit { model.recompute() }
+            .accessibilityIdentifier("villain-range-field")
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(NamedRange.presets, id: \.name) { preset in
+                    Button(preset.name) { model.villainRangeText = preset.notation; model.recompute() }
+                        .buttonStyle(OutlineButtonStyle(height: 32))
                 }
             }
         }
-        .panel()
-    }
-
-    private var boardPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Board").font(.headline)
-            CardSlotsRow(cards: model.board, label: "Board") { model.pickerSlot = .board($0) }
+        if let error = model.rangeError {
+            Label(error, systemImage: "exclamationmark.triangle").font(Theme.caption).foregroundStyle(Theme.red)
         }
-        .panel()
     }
 
-    @ViewBuilder private var resultPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func handRow<Cards: View>(label: String, description: String, equity: Double?, muted: Bool,
+                                      @ViewBuilder cards: () -> Cards) -> some View {
+        HStack(spacing: 16) {
+            cards().dynamicTypeSize(...DynamicTypeSize.large)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(Theme.caption).foregroundStyle(Theme.muted)
+                Text(description).font(Theme.label).lineLimit(2).minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(equity.map { Theme.percent($0) } ?? "–")
+                .font(Theme.bigNumber)
+                .tracking(-0.5)
+                .foregroundStyle(muted ? Theme.muted : Theme.ink)
+                .contentTransition(.numericText(value: equity ?? 0))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .accessibilityLabel(equity.map { "\(label) equity \(Theme.percent($0))" } ?? "No result yet")
+        }
+        .motionAware(equity ?? 0)
+    }
+
+    private func describe(_ cards: [Card?]) -> String {
+        guard let a = cards[0], let b = cards[1] else { return "Pick two cards" }
+        return HoleCards(a, b).handClass.spokenName.capitalizedFirst
+    }
+
+    private var villainDescription: String {
+        if model.villainMode == .hand { return describe(model.villain) }
+        let text = model.villainRangeText.trimmingCharacters(in: .whitespaces)
+        return NamedRange.presets.first { $0.notation == text }?.name ?? "Custom range"
+    }
+
+    // MARK: Result, board, math
+
+    @ViewBuilder private var resultBar: some View {
+        VStack(alignment: .leading, spacing: 10) {
             if let snap = model.snapshot {
-                EquityBars(hero: snap.equities[0], villain: snap.equities[1], standardError: snap.standardErrors[0])
+                let win = snap.winProbabilities[0], tie = snap.tieProbabilities[0]
+                SplitBar(win: win, tie: tie)
                 HStack {
-                    Label(snap.isExact ? "\(snap.samples.formatted()) boards enumerated" : "\(snap.samples.formatted()) simulated deals",
-                          systemImage: snap.isExact ? "checkmark.seal" : "dice")
-                        .contentTransition(.numericText(value: Double(snap.samples)))
+                    Text("Win \(Theme.percent(win))")
                     Spacer()
-                    if model.isRunning { ProgressView().controlSize(.small) }
+                    Text("Tie \(Theme.percent(tie))")
+                    Spacer()
+                    Text("Lose \(Theme.percent(max(0, 1 - win - tie)))")
                 }
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                HStack(spacing: 16) {
-                    stat("Win", snap.winProbabilities[0])
-                    stat("Tie", snap.tieProbabilities[0])
-                    stat("Lose", 1 - snap.winProbabilities[0] - snap.tieProbabilities[0])
-                }
+                .font(Theme.eyebrow.monospacedDigit().weight(.regular))
+                .foregroundStyle(Theme.muted)
+                .accessibilityElement(children: .combine)
             } else {
-                Label(model.message ?? "Pick cards to start", systemImage: "hand.point.up.left")
-                    .foregroundStyle(.secondary)
+                SplitBar(win: 0)
+                Text(model.message ?? "Pick cards to start").font(Theme.caption).foregroundStyle(Theme.muted)
             }
             if let message = model.message, model.snapshot != nil {
-                Text(message).font(.footnote).foregroundStyle(.secondary)
+                Text(message).font(Theme.caption).foregroundStyle(Theme.muted)
             }
         }
-        .panel()
         .accessibilityIdentifier("equity-result")
     }
 
-    private func stat(_ label: String, _ x: Double) -> some View {
-        VStack(alignment: .leading) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            Text(Theme.percent(x)).font(Theme.smallNumber).contentTransition(.numericText(value: x))
+    private var boardSlots: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Board").font(Theme.caption).foregroundStyle(Theme.muted)
+            CardSlotsRow(cards: model.board, label: "Board", baseWidth: 56, spacing: 8) { model.pickerSlot = .board($0) }
+                .dynamicTypeSize(...DynamicTypeSize.large)
         }
-        .accessibilityElement(children: .combine)
     }
 
-    private var convergencePanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Convergence").font(.headline)
-            Text("Your equity estimate as deals accumulate, with its 95% interval.")
-                .font(.footnote).foregroundStyle(.secondary)
-            Chart(model.convergence) { p in
-                AreaMark(x: .value("Deals", p.trials), yStart: .value("Low", p.low), yEnd: .value("High", p.high))
-                    .foregroundStyle(Theme.hero.opacity(0.18))
-                LineMark(x: .value("Deals", p.trials), y: .value("Equity", p.equity))
-                    .foregroundStyle(Theme.hero)
-                    .interpolationMethod(.monotone)
+    private var mathDisclosure: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                showMath.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(showMath ? "Hide the math" : "Show the math").font(Theme.label)
+                    Image(systemName: "chevron.down")
+                        .font(.footnote)
+                        .rotationEffect(.degrees(showMath ? 180 : 0))
+                        .accessibilityHidden(true)
+                    Spacer()
+                    if model.isRunning { ProgressView().controlSize(.small).tint(Theme.muted) }
+                }
+                .foregroundStyle(Theme.ink)
+                .frame(minHeight: 44)
+                .contentShape(.rect)
             }
-            .chartYScale(domain: yDomain)
-            .chartYAxis { AxisMarks(format: FloatingPointFormatStyle<Double>.Percent().precision(.fractionLength(0))) }
-            .chartXAxis { AxisMarks(format: IntegerFormatStyle<Int>().notation(.compactName)) }
-            .frame(height: 180)
-            .accessibilityLabel("Convergence chart")
-            .accessibilityValue(model.convergence.last.map { "Latest estimate \(Theme.percent($0.equity)) after \($0.trials) deals" } ?? "")
+            .buttonStyle(.plain)
+            .accessibilityValue(showMath ? "Expanded" : "Collapsed")
+            .accessibilityIdentifier("show-math")
+            if showMath { convergenceCard.transition(.opacity) }
+        }
+        .motionAware(showMath)
+    }
+
+    private var convergenceCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Convergence").font(Theme.label)
+                Spacer()
+                if let snap = model.snapshot {
+                    Text("\(snap.samples.formatted(.number.notation(.compactName))) \(snap.isExact ? "boards · exact" : "deals · Monte Carlo")")
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(Theme.muted)
+                }
+            }
+            if model.convergence.count > 1 {
+                Chart {
+                    if let last = model.convergence.last {
+                        RuleMark(y: .value("Final", last.equity))
+                            .foregroundStyle(Theme.border)
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    }
+                    ForEach(model.convergence) { p in
+                        AreaMark(x: .value("Deals", p.trials), yStart: .value("Low", p.low), yEnd: .value("High", p.high))
+                            .foregroundStyle(Theme.subtle)
+                        LineMark(x: .value("Deals", p.trials), y: .value("Equity", p.equity))
+                            .foregroundStyle(Theme.ink)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, lineJoin: .round))
+                    }
+                }
+                .chartYScale(domain: yDomain)
+                .chartYAxis { AxisMarks(format: FloatingPointFormatStyle<Double>.Percent().precision(.fractionLength(0))) }
+                .chartXAxis { AxisMarks(format: IntegerFormatStyle<Int>().notation(.compactName)) }
+                .frame(height: 120)
+                .accessibilityLabel("Convergence chart")
+                .accessibilityValue(model.convergence.last.map { "Estimate \(Theme.percent($0.equity)) after \($0.trials) deals" } ?? "")
+                Text("Your equity estimate as deals accumulate, with its 95% interval shaded. Exact results enumerate every board.")
+                    .font(Theme.caption).foregroundStyle(Theme.muted)
+            } else {
+                Text(model.snapshot?.isExact == true
+                     ? "Exact: every remaining board was enumerated, so there is nothing to converge."
+                     : "Pick a spot to watch the estimate converge.")
+                    .font(Theme.caption).foregroundStyle(Theme.muted)
+            }
         }
         .panel()
     }
@@ -174,18 +269,26 @@ struct EquityLabView: View {
         return lo < hi ? lo...hi : 0...1
     }
 
-    private var toolsPanel: some View {
-        VStack(spacing: 0) {
-            NavigationLink(value: AppRouter.Destination.solver) {
-                Label("Push/Fold Solver", systemImage: "function").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
-            }
-            Divider()
-            NavigationLink(value: AppRouter.Destination.camera) {
-                Label("Scan a Table", systemImage: "camera.viewfinder").frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10)
+    private var tools: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tools").eyebrowStyle()
+            RowGroup {
+                NavigationLink(value: AppRouter.Destination.solver) {
+                    ListRow(symbol: "function", title: "Push/Fold Solver", subtitle: "Heads-up Nash ranges, solved live")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tool-solver")
+                NavigationLink(value: AppRouter.Destination.camera) {
+                    ListRow(symbol: "camera.viewfinder", title: "Scan a Table", subtitle: "Read real cards with the camera")
+                }
+                .buttonStyle(.plain)
             }
         }
-        .panel()
     }
+}
+
+extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }
 
 /// A spot pushed into the Equity Lab from elsewhere (camera, App Intents).

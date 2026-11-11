@@ -19,8 +19,9 @@ final class SolverUITests: XCTestCase {
 
     func testSolverOnGPUDoesNotCrash() {
         app.tabBars.buttons["Lab"].tap()
-        let link = app.buttons["Push/Fold Solver"]
+        let link = element("tool-solver")
         XCTAssertTrue(link.waitForExistence(timeout: 10))
+        app.swipeUp()
         link.tap()
         let gpu = app.buttons["GPU (Metal)"]
         XCTAssertTrue(gpu.waitForExistence(timeout: 10))
