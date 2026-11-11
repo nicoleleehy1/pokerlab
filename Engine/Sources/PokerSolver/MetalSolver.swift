@@ -15,7 +15,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
     let wBuffer: MTLBuffer, aBuffer: MTLBuffer, rowBuffer: MTLBuffer
     let matrices: PushFoldMatrices
 
-    public enum SolverError: Error { case noDevice, commandFailed(String) }
+    public enum SolverError: Error { case noDevice, commandFailed(String), unsupportedThreadgroupSize(Int) }
 
     /// `rowPerThread`: one thread per hand class, serial 169-term dot products (v1).
     /// `simdGroupRows`: 1,024 threads per depth; each row's dot product is split across a
@@ -23,7 +23,25 @@ public final class MetalCFRSolver: @unchecked Sendable {
     public enum Kernel: String, CaseIterable, Sendable {
         case rowPerThread = "cfr_push_fold"
         case simdGroupRows = "cfr_push_fold_simd"
+        /// Preferred threadgroup width. The real width is clamped to what the pipeline allows.
         var threadsPerGroup: Int { self == .rowPerThread ? 192 : 1024 }
+
+        /// The threadgroup width to dispatch with on this pipeline, or nil if it cannot run.
+        /// Limits vary by GPU and are much lower on the iOS Simulator, and dispatching more
+        /// threads than `maxTotalThreadsPerThreadgroup` trips a Metal validation assert.
+        func threadCount(for pipeline: MTLComputePipelineState) -> Int? {
+            let limit = min(threadsPerGroup, pipeline.maxTotalThreadsPerThreadgroup)
+            switch self {
+            case .rowPerThread:
+                // One thread per hand class: needs at least 169 threads in the group.
+                return limit >= PushFoldMatrices.n ? limit : nil
+            case .simdGroupRows:
+                // Whole SIMD groups only; the kernel strides by the real group count.
+                let width = max(1, pipeline.threadExecutionWidth)
+                let threads = limit / width * width
+                return threads >= width ? threads : nil
+            }
+        }
     }
 
     public init(matrices: PushFoldMatrices = .shared) throws {
@@ -70,7 +88,12 @@ public final class MetalCFRSolver: @unchecked Sendable {
             guard let cmd = queue.makeCommandBuffer(), let enc = cmd.makeComputeCommandEncoder() else {
                 throw SolverError.commandFailed("could not create command buffer")
             }
-            enc.setComputePipelineState(pipelines[kernel]!)
+            let pipeline = pipelines[kernel]!
+            guard let threads = kernel.threadCount(for: pipeline) else {
+                enc.endEncoding()
+                throw SolverError.unsupportedThreadgroupSize(pipeline.maxTotalThreadsPerThreadgroup)
+            }
+            enc.setComputePipelineState(pipeline)
             enc.setBuffer(wBuffer, offset: 0, index: 0)
             enc.setBuffer(aBuffer, offset: 0, index: 1)
             enc.setBuffer(rowBuffer, offset: 0, index: 2)
@@ -78,7 +101,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
             enc.setBuffer(state, offset: 0, index: 4)
             enc.setBytes(&params, length: 8, index: 5)
             enc.dispatchThreadgroups(MTLSize(width: depthCount, height: 1, depth: 1),
-                                     threadsPerThreadgroup: MTLSize(width: kernel.threadsPerGroup, height: 1, depth: 1))
+                                     threadsPerThreadgroup: MTLSize(width: threads, height: 1, depth: 1))
             enc.endEncoding()
             cmd.commit()
             cmd.waitUntilCompleted()
@@ -188,34 +211,38 @@ public final class MetalCFRSolver: @unchecked Sendable {
         }
     }
 
-    // v2: rows are distributed over 32 SIMD groups; the 32 lanes of a group split each
-    // 169-term dot product and reduce with simd_sum. Per-class state lives in threadgroup memory.
+    // v2: rows are distributed over the threadgroup's SIMD groups; the lanes of a group split
+    // each 169-term dot product and reduce with simd_sum. Per-class state lives in threadgroup
+    // memory. Strides come from the dispatch, so any whole number of SIMD groups works.
     kernel void cfr_push_fold_simd(device const float *W      [[buffer(0)]],
                                    device const float *A      [[buffer(1)]],
                                    device const float *rowSum [[buffer(2)]],
                                    device const float *stacks [[buffer(3)]],
                                    device float *state        [[buffer(4)]],
                                    constant Params &params    [[buffer(5)]],
-                                   uint tid   [[thread_index_in_threadgroup]],
-                                   uint lane  [[thread_index_in_simdgroup]],
-                                   uint sg    [[simdgroup_index_in_threadgroup]],
-                                   uint depth [[threadgroup_position_in_grid]])
+                                   uint tid     [[thread_index_in_threadgroup]],
+                                   uint lane    [[thread_index_in_simdgroup]],
+                                   uint sg      [[simdgroup_index_in_threadgroup]],
+                                   uint threads [[threads_per_threadgroup]],
+                                   uint groups  [[simdgroups_per_threadgroup]],
+                                   uint width   [[threads_per_simdgroup]],
+                                   uint depth   [[threadgroup_position_in_grid]])
     {
         threadgroup float rp[P], rf[P], rc[P], rx[P], sp[P], sc[P], p[P], c[P], next[P];
         device float *st = state + depth * 8 * P;
         const float S = stacks[depth];
-        for (uint i = tid; i < P; i += 1024) {
+        for (uint i = tid; i < P; i += threads) {
             rp[i] = st[i]; rf[i] = st[P + i]; rc[i] = st[2 * P + i]; rx[i] = st[3 * P + i];
             sp[i] = st[4 * P + i]; sc[i] = st[5 * P + i]; p[i] = st[6 * P + i]; c[i] = st[7 * P + i];
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         for (uint k = 0; k < params.iterations; k++) {
             const float t = float(params.startIteration + k + 1);
-            for (uint r = sg; r < N; r += 32) {
+            for (uint r = sg; r < N; r += groups) {
                 device const float *a = A + r * P;
                 device const float *w = W + r * P;
                 float ac = 0, wc = 0;
-                for (uint j = lane; j < N; j += 32) { float cj = c[j]; ac = fma(a[j], cj, ac); wc = fma(w[j], cj, wc); }
+                for (uint j = lane; j < N; j += width) { float cj = c[j]; ac = fma(a[j], cj, ac); wc = fma(w[j], cj, wc); }
                 ac = simd_sum(ac); wc = simd_sum(wc);
                 if (lane == 0) {
                     float rs = rowSum[r];
@@ -229,13 +256,13 @@ public final class MetalCFRSolver: @unchecked Sendable {
                 }
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (uint i = tid; i < N; i += 1024) p[i] = next[i];
+            for (uint i = tid; i < N; i += threads) p[i] = next[i];
             threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (uint r = sg; r < N; r += 32) {
+            for (uint r = sg; r < N; r += groups) {
                 device const float *a = A + r * P;
                 device const float *w = W + r * P;
                 float ap = 0, wp = 0;
-                for (uint j = lane; j < N; j += 32) { float pj = p[j]; ap = fma(a[j], pj, ap); wp = fma(w[j], pj, wp); }
+                for (uint j = lane; j < N; j += width) { float pj = p[j]; ap = fma(a[j], pj, ap); wp = fma(w[j], pj, wp); }
                 ap = simd_sum(ap); wp = simd_sum(wp);
                 if (lane == 0) {
                     float vCall = S * ap, vFold = -wp;
@@ -248,10 +275,10 @@ public final class MetalCFRSolver: @unchecked Sendable {
                 }
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (uint i = tid; i < N; i += 1024) c[i] = next[i];
+            for (uint i = tid; i < N; i += threads) c[i] = next[i];
             threadgroup_barrier(mem_flags::mem_threadgroup);
         }
-        for (uint i = tid; i < N; i += 1024) {
+        for (uint i = tid; i < N; i += threads) {
             st[i] = rp[i]; st[P + i] = rf[i]; st[2 * P + i] = rc[i]; st[3 * P + i] = rx[i];
             st[4 * P + i] = sp[i]; st[5 * P + i] = sc[i]; st[6 * P + i] = p[i]; st[7 * P + i] = c[i];
         }

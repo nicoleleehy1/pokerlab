@@ -122,8 +122,13 @@ struct SolverView: View {
             case .cpu:
                 return CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10)
             case .gpu:
-                guard let gpu = try? MetalCFRSolver() else { return nil }
-                return try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10).first
+                // Fall back to the CPU solver if Metal is missing or rejects the dispatch
+                // (the iOS Simulator's GPU limits are lower than real hardware).
+                if let gpu = try? MetalCFRSolver(),
+                   let solved = try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10).first {
+                    return solved
+                }
+                return CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10)
             }
         }.value
         if Task.isCancelled { return }
