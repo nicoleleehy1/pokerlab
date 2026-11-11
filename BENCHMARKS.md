@@ -167,3 +167,53 @@ DCFR(1.5, 0.0, 2.0)  | < 1.0: median 20, mean 20, worst 20 (40/40) | < 0.1: medi
 - The reduction is in line with the 2-3x Brown & Sandholm report for CFR+ vs DCFR, and larger
   at tight targets. Push/fold trees contain costly mistakes (folding aces, calling with 72o),
   where CFR+ is known to be slow.
+
+## River solver (full-range, on-device CPU)
+
+`swift run -c release PokerBench river <n>`, one process per spot so the peak footprint
+belongs to that spot alone. Pot 10, 100 behind, bets of 33%/75% pot (1 size: 75%;
+3 sizes: 33%/75%/150%), raises of 75% of the pot after calling, all-in always available,
+at most 3 bets/raises. DCFR(1.5, 0, 2), single thread, exploitability (exact best response)
+checked every 10 iterations and not counted in "solve":
+
+```
+Full ranges, Ks9h5c4d2s, 2 sizes: hands 1081/1081 (canonical 1081/1081), 24 decision nodes, tables 0.56 MB
+   180 iterations, exploitability 0.291% pot, solve 204.7 ms, setup 34.5 ms, wall incl. checks 260.9 ms, process peak footprint 6.8 MB
+Full ranges, Qh8c7c3d2s, 2 sizes: hands 1081/1081 (canonical 1081/1081), 24 decision nodes, tables 0.56 MB
+   190 iterations, exploitability 0.272% pot, solve 206.3 ms, setup 20.2 ms, wall incl. checks 248.5 ms, process peak footprint 6.8 MB
+Full ranges, 2c7c9cJdKd (iso), 2 sizes: hands 1081/1081 (canonical 652/652), 24 decision nodes, tables 0.34 MB
+   180 iterations, exploitability 0.296% pot, solve 159.6 ms, setup 19.3 ms, wall incl. checks 195.5 ms, process peak footprint 6.8 MB
+Full ranges, Ks9h5c4d2s, 1 size: hands 1081/1081 (canonical 1081/1081), 8 decision nodes, tables 0.17 MB
+   140 iterations, exploitability 0.273% pot, solve 45.8 ms, setup 19.3 ms, wall incl. checks 70.1 ms, process peak footprint 6.7 MB
+Full ranges, Ks9h5c4d2s, 3 sizes: hands 1081/1081 (canonical 1081/1081), 32 decision nodes, tables 0.76 MB
+   190 iterations, exploitability 0.288% pot, solve 279.3 ms, setup 20.5 ms, wall incl. checks 329.7 ms, process peak footprint 6.8 MB
+BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: hands 536/335 (canonical 536/335), 24 decision nodes, tables 0.23 MB
+   200 iterations, exploitability 0.300% pot, solve 93.9 ms, setup 18.7 ms, wall incl. checks 122.5 ms, process peak footprint 6.7 MB
+```
+
+| Spot | Hands (OOP/IP) | Iterations to ≤ 0.3% pot | Solve time | Peak footprint |
+|---|---|---|---|---|
+| Any two cards, 1 size | 1081 / 1081 | 140 | 45.8 ms | 6.7 MB |
+| Any two cards, 2 sizes (two boards) | 1081 / 1081 | 180-190 | 205-206 ms | 6.8 MB |
+| Any two cards, 2 sizes, suit-isomorphic board | 652 / 652 canonical | 180 | 159.6 ms | 6.8 MB |
+| Any two cards, 3 sizes | 1081 / 1081 | 190 | 279.3 ms | 6.8 MB |
+| BB defend vs BTN open, 2 sizes | 536 / 335 | 200 | 93.9 ms | 6.7 MB |
+
+- **Machine:** the MacBook Pro M3 Pro above, release build, one thread. **iPhone numbers
+  are not measured yet** (they need a device and a signing team). The research doc's
+  estimate for an A17/A18 was 0.1-1 s for 1,000 iterations; this solver needs under 200
+  iterations for 0.3% of the pot.
+- **Peak footprint** is the whole benchmark process (`ri_lifetime_max_phys_footprint`, the
+  figure iOS jetsam limits apply to). The solver's own regret and strategy tables are
+  0.17-0.76 MB; the rest is the binary, evaluator tables and runtime.
+- **How it's fast:** hand strengths are computed once (the board is fixed), showdowns are an
+  O(n) two-pointer sweep with per-card blocker sums for card removal, folds use the same
+  blocker sums, and regret matching and the DCFR updates run eight hands at a time on
+  SIMD8. On boards where suits are interchangeable (here: hearts and spades), suit
+  isomorphism cuts the hand list from 1,081 to 652 and solve time by 22%.
+- **Correctness checks (in `swift test`):** the clairvoyance game for s = 0.5, 1, 2 and an
+  AKQ-style river match their closed forms (bluff s/(1+s), call 1/(1+s), value
+  (1 + 2s)/(2(1 + s)) of the pot); sweep terminal values equal an O(n²) brute force; the
+  isomorphic solve matches the full solve; EVs are zero-sum; sets never fold.
+- In the simulator's Debug build the BB-vs-BTN solve took about 5.5 s. Debug builds the
+  engine without optimisation, so that figure is not a performance number.

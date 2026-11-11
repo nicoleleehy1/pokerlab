@@ -14,6 +14,7 @@ struct LabTab: View {
                     switch d {
                     case .solver: SolverView()
                     case .toyGames: ToyGameLabView()
+                    case .riverSolver: RiverSolverView()
                     case .camera: CameraScanView()
                     default: EmptyView()
                     }
@@ -274,6 +275,11 @@ struct EquityLabView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Tools").eyebrowStyle()
             RowGroup {
+                NavigationLink(value: AppRouter.Destination.riverSolver) {
+                    ListRow(symbol: "square.stack.3d.up", title: "River solver", subtitle: "Full ranges, solved on this device")
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("tool-river")
                 NavigationLink(value: AppRouter.Destination.solver) {
                     ListRow(symbol: "function", title: "Push/Fold Solver", subtitle: "Heads-up Nash ranges, solved live")
                 }

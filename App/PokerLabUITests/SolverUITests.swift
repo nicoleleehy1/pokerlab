@@ -55,3 +55,22 @@ final class ToyGameUITests: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class RiverSolverUITests: XCTestCase {
+    func testRiverSolveReachesTarget() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
+        app.launch()
+        app.tabBars.buttons["Lab"].tap()
+        let link = app.descendants(matching: .any).matching(identifier: "tool-river").firstMatch
+        XCTAssertTrue(link.waitForExistence(timeout: 10))
+        app.swipeUp()
+        link.tap()
+        XCTAssertTrue(app.staticTexts["Big blind, first to act"].waitForExistence(timeout: 120), "river solve did not finish")
+        if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("river.png"))
+        }
+        XCTAssertEqual(app.state, .runningForeground)
+    }
+}

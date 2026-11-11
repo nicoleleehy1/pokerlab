@@ -30,6 +30,7 @@ final class AppRouter {
         case dailyDrill
         case solver
         case toyGames
+        case riverSolver
         case camera
         case settings
     }
@@ -40,7 +41,7 @@ final class AppRouter {
             tab = .practice
             practicePath = NavigationPath()
             practicePath.append(destination)
-        case .solver, .camera, .toyGames:
+        case .solver, .camera, .toyGames, .riverSolver:
             tab = .lab
             labPath = NavigationPath()
             labPath.append(destination)
@@ -58,6 +59,7 @@ final class AppRouter {
         case "daily": open(.dailyDrill)
         case "solver": open(.solver)
         case "toys": open(.toyGames)
+        case "river": open(.riverSolver)
         case "camera": open(.camera)
         case "lab": tab = .lab
         case "learn": tab = .learn

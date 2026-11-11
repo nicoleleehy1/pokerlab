@@ -1,5 +1,6 @@
 import PokerCore
 import PokerSolver
+import Darwin
 
 // PokerBench: prints throughput numbers for BENCHMARKS.md. Run with:
 //   swift run -c release PokerBench [core|solver|all]   (default: all)
@@ -31,6 +32,7 @@ if mode == "core" || mode == "all" { try await runCore() }
 if mode == "solver" || mode == "all" { try await runSolver() }
 if mode == "toy" || mode == "all" { runToy() }
 if mode == "dcfr" || mode == "all" { await runDCFR() }
+if mode == "river" || mode == "all" { runRiver(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 print("")
 print("checksum \(checksum)")
 
@@ -238,5 +240,47 @@ func runDCFR() async {
             line += " | < \(target): median \(median), mean \(fmt(mean, 0)), worst \(reached.last ?? 0) (\(reached.count)/40)"
         }
         print(line + " | wall incl. checks \(fmt(wall, 2)) s")
+    }
+}
+
+/// Process peak physical footprint (what jetsam limits on iOS), in MB.
+func peakFootprintMB() -> Double {
+    var info = rusage_info_v4()
+    let ok = withUnsafeMutablePointer(to: &info) { ptr in
+        ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(getpid(), RUSAGE_INFO_V4, $0) }
+    }
+    return ok == 0 ? Double(info.ri_lifetime_max_phys_footprint) / 1_048_576 : .nan
+}
+
+// A function, not a global: main.swift globals initialise in source order, after the calls above.
+func riverSpots() -> [(name: String, spot: RiverSpot)] {
+    func c(_ s: String) -> [Card] { CardSet(parsing: s)!.sortedForDisplay }
+    let bb = try! HandRange("22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K7o+, Q8o+, J8o+, T8o+, 98o")
+    let btn = try! HandRange("22+, A2s+, K5s+, Q8s+, J8s+, T8s+, 97s+, 86s+, 75s+, 65s, 54s, A7o+, K9o+, QTo+, JTo")
+    return [
+        ("Full ranges, Ks9h5c4d2s, 2 sizes", RiverSpot(board: c("Ks9h5c4d2s"), pot: 10, stack: 100, oop: .all, ip: .all)),
+        ("Full ranges, Qh8c7c3d2s, 2 sizes", RiverSpot(board: c("Qh8c7c3d2s"), pot: 10, stack: 100, oop: .all, ip: .all)),
+        ("Full ranges, 2c7c9cJdKd (iso), 2 sizes", RiverSpot(board: c("2c7c9cJdKd"), pot: 10, stack: 100, oop: .all, ip: .all)),
+        ("Full ranges, Ks9h5c4d2s, 1 size", RiverSpot(board: c("Ks9h5c4d2s"), pot: 10, stack: 100, oop: .all, ip: .all,
+                                                       config: .init(betSizes: [0.75], raiseSizes: [], maxBets: 2))),
+        ("Full ranges, Ks9h5c4d2s, 3 sizes", RiverSpot(board: c("Ks9h5c4d2s"), pot: 10, stack: 100, oop: .all, ip: .all,
+                                                        config: .init(betSizes: [0.33, 0.75, 1.5], raiseSizes: [0.75], maxBets: 3))),
+        ("BB vs BTN ranges, Ks9h5c4d2s, 2 sizes", RiverSpot(board: c("Ks9h5c4d2s"), pot: 10, stack: 100, oop: bb, ip: btn)),
+    ]
+}
+
+/// Solve time (DCFR, exploitability checked every 10 iterations, not timed) to 0.3% of the pot.
+func runRiver(only: Int?) {
+    print("\nRiver solver: DCFR(1.5, 0, 2) to 0.3% pot exploitability, checked every 10 iterations")
+    for (i, entry) in riverSpots().enumerated() where only == nil || only == i {
+        let clock = ContinuousClock()
+        let t0 = clock.now
+        let solver = try! RiverSolver(spot: entry.spot)
+        let setup = seconds(clock.now - t0)
+        let r = solver.solve(targetExploitability: 0.3, maxIterations: 5000, checkEvery: 10)
+        let wall = seconds(clock.now - t0)
+        let h = solver.handCounts, k = solver.canonicalHandCounts
+        print("\(entry.name): hands \(h.oop)/\(h.ip) (canonical \(k.oop)/\(k.ip)), \(solver.decisionNodeCount) decision nodes, tables \(fmt(Double(solver.storageBytes) / 1_048_576, 2)) MB")
+        print("   \(r.iterations) iterations, exploitability \(fmt(r.exploitability, 3))% pot, solve \(fmt(r.solveSeconds * 1000, 1)) ms, setup \(fmt(setup * 1000, 1)) ms, wall incl. checks \(fmt(wall * 1000, 1)) ms, process peak footprint \(fmt(peakFootprintMB(), 1)) MB")
     }
 }

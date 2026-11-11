@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0373F5FBC6A0A15F5F2520BD /* RiverSolverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC25B2588C59A46C71247FFC /* RiverSolverView.swift */; };
 		08FCBD24230C0CAE03AC1DC9 /* ProgressAggregator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 636C59B9587B59A09A000BD4 /* ProgressAggregator.swift */; };
 		09CA578E00AC619BAE3908DB /* PokerLabIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 307149446D9AAF39285C073B /* PokerLabIntents.swift */; };
 		09CAC5CC1A9848E2146C6C36 /* DrillSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14FE49A9E1509F96AFE85025 /* DrillSessionView.swift */; };
@@ -113,6 +114,7 @@
 		812622AA395B79754E3D0898 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
 		97FB70E960CA3BF56026CD28 /* LearnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnView.swift; sourceTree = "<group>"; };
 		9D882C4374BD6DAE973704EF /* CardScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScanner.swift; sourceTree = "<group>"; };
+		AC25B2588C59A46C71247FFC /* RiverSolverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiverSolverView.swift; sourceTree = "<group>"; };
 		AC39D0DF067E39796836B1DD /* LiveActivityController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveActivityController.swift; sourceTree = "<group>"; };
 		ACCFCEE8FE594EAFBD892B1E /* PokerLabWidgets.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = PokerLabWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B422DC131F361B937B2FA582 /* PokerLabApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PokerLabApp.swift; sourceTree = "<group>"; };
@@ -169,6 +171,7 @@
 			children = (
 				BB263A623D176A2984ACED83 /* EquityLabModel.swift */,
 				7B848C861C60446F54668545 /* EquityLabView.swift */,
+				AC25B2588C59A46C71247FFC /* RiverSolverView.swift */,
 				B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */,
 			);
 			path = Lab;
@@ -531,6 +534,7 @@
 				EC4BA623875AD3C4DD40E522 /* ProfileView.swift in Sources */,
 				08FCBD24230C0CAE03AC1DC9 /* ProgressAggregator.swift in Sources */,
 				B310ED86ECC1866AE872FB65 /* RangeGridView.swift in Sources */,
+				0373F5FBC6A0A15F5F2520BD /* RiverSolverView.swift in Sources */,
 				31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */,
 				82C33BFE5E6B5BB59634C5A8 /* SolverView.swift in Sources */,
 				13D22141BAE45B09599F2103 /* Theme.swift in Sources */,

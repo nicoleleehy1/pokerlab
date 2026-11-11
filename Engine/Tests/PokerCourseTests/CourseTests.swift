@@ -33,7 +33,7 @@ struct GradingTests {
 
 @Suite("Question generators")
 struct GeneratorTests {
-    static let available = TemplateID.allCases.filter { !$0.needsRiverSolver }
+    static let available = TemplateID.allCases
 
     @Test("Every template produces gradable questions", arguments: available)
     func templateIsWellFormed(_ t: TemplateID) async throws {
@@ -57,9 +57,27 @@ struct GeneratorTests {
         }
     }
 
-    @Test func riverTemplatesAreLockedWithoutTheSolver() async {
-        guard RiverQuestions.generator == nil else { return }
-        await #expect(throws: CourseError.requiresRiverSolver) { try await TemplateID.riverBet.generate(seed: 1) }
+    /// River questions: the best option's EV comes from a solve that stopped at 0.5% pot
+    /// exploitability, and folding is worth exactly the half pot already lost (0).
+    @Test func riverDefendFoldIsZero() async throws {
+        for seed in UInt64(1)...4 {
+            let q = try await TemplateID.riverDefend.generate(seed: seed)
+            #expect(q.options[0].label == "Fold")
+            #expect(abs(q.options[0].ev) < 1e-4, "fold EV \(q.options[0].ev)")
+        }
+    }
+
+    /// Against a station that never folds, pure bluffs lose: the weakest hands should check.
+    @Test func stationQuestionsPunishBluffs() async throws {
+        var checked = 0
+        for seed in UInt64(1)...12 {
+            let q = try await TemplateID.exploitStation.generate(seed: seed)
+            let check = q.options[0]
+            #expect(check.label == "Check")
+            // Every bet EV is at most checking's EV for hands that never win at showdown.
+            if check.ev < 0.5 { for o in q.options.dropFirst() { #expect(o.ev <= check.ev + 0.05, "\(o.label) \(o.ev) vs check \(check.ev)") }; checked += 1 }
+        }
+        #expect(checked > 0)
     }
 
     @Test func requiredEquityMatchesFormula() async throws {
@@ -182,7 +200,7 @@ struct ProgressTests {
         }
         let p = CourseProgress(records: early, today: 1)
         let current = p.path().first { $0.status == .current }!
-        if RiverCapability.isAvailable { #expect(current.unit == 7) } else { #expect(current.unit == 10) }
+        #expect(current.unit == (RiverCapability.isAvailable ? 7 : 10))
     }
 
     @Test func curriculumHasTenUnits() {

@@ -124,7 +124,7 @@ public enum Curriculum {
     }
 }
 
-/// Whether the river solver exists in this build (units 7-9 need it).
+/// Units 7-9 need the river solver (PokerSolver.RiverSolver), which this build has.
 public enum RiverCapability {
-    public static let isAvailable = false
+    public static let isAvailable = true
 }

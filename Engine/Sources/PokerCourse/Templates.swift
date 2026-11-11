@@ -1,10 +1,6 @@
 import PokerCore
 import PokerSolver
 
-public enum CourseError: Error, Equatable, Sendable {
-    /// The template needs the river solver, which this build doesn't have yet.
-    case requiresRiverSolver
-}
 
 /// A question template. Each review deals a fresh spot from it (the adaptive layer schedules
 /// templates, not individual hands).
@@ -60,16 +56,13 @@ public enum TemplateID: String, CaseIterable, Hashable, Sendable, Codable {
         case .callShove: return await g.callShove()
         case .icmCall: return g.icmCall()
         case .caveats: return g.caveats()
-        case .rangeAdvantage, .riverBet, .riverDefend, .exploitNit, .exploitStation:
-            guard let river = RiverQuestions.generator else { throw CourseError.requiresRiverSolver }
-            return try await river(self, seed)
+        case .rangeAdvantage: return try g.rangeAdvantage()
+        case .riverBet: return try g.riverBet()
+        case .riverDefend: return try g.riverDefend(exploit: false)
+        case .exploitNit: return try g.riverDefend(exploit: true)
+        case .exploitStation: return try g.exploitStation()
         }
     }
-}
-
-/// Hook for the river-solver templates (units 7-9), installed by the river module.
-public enum RiverQuestions {
-    nonisolated(unsafe) public static var generator: (@Sendable (TemplateID, UInt64) async throws -> Question)?
 }
 
 /// Named villain ranges used by the generators (study ranges, not solver output).
