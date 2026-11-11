@@ -20,8 +20,15 @@ struct LessonQuestionData: Identifiable, Sendable {
     let explanation: String
     /// Optional per-option note, e.g. "Calling loses 0.8 bb (3% of the pot)".
     var optionNotes: [String] = []
+    /// Optional per-option feedback title (EV-loss verdicts).
+    var optionTitles: [String] = []
+    /// EV loss of each option as a fraction of the pot.
+    var lossFractions: [Double] = []
+    /// Template the question came from (for the adaptive layer).
+    var templateID: String?
 
     func feedbackTitle(for choice: Int) -> String {
+        if choice < optionTitles.count { return optionTitles[choice] }
         if correct.contains(choice) { return correct.count > 1 ? "Correct. Both are fine here" : "Correct" }
         let answers = correct.sorted().map { options[$0] }
         return "Not quite. The answer is \(answers.formatted(.list(type: .or)))"
@@ -39,6 +46,9 @@ struct LessonOutcome: Sendable {
     let total: Int
     /// Index of the chosen option per question.
     let choices: [Int]
+    /// EV loss per answer as a fraction of the pot.
+    let lossFractions: [Double]
+    var meanLossFraction: Double { lossFractions.isEmpty ? 0 : lossFractions.reduce(0, +) / Double(lossFractions.count) }
 }
 
 /// Drives a lesson: picks, checks, advances.
@@ -85,7 +95,10 @@ final class LessonRunner {
         if index < questions.count - 1 { index += 1 }
     }
 
-    var outcome: LessonOutcome { LessonOutcome(correct: correctCount, total: questions.count, choices: choices) }
+    var outcome: LessonOutcome {
+        let losses = zip(questions, choices).map { q, c in c < q.lossFractions.count ? q.lossFractions[c] : (q.correct.contains(c) ? 0 : 1) }
+        return LessonOutcome(correct: correctCount, total: questions.count, choices: choices, lossFractions: losses)
+    }
 }
 
 /// Lesson screen from docs/design/Lesson.dc.html: close button, segmented progress, the spot,

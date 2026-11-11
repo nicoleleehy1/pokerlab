@@ -32,6 +32,7 @@
 		9304C00E6E85D692F60CEDBF /* PokerTraining in Frameworks */ = {isa = PBXBuildFile; productRef = CA5AD874F24D2E9079E39D86 /* PokerTraining */; };
 		95D2EE9D94E9E9E6BA45E801 /* PokerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 94DD456785DEDD6A72D0CDD9 /* PokerCore */; };
 		991D9F0E59A4C09F1B57E8A5 /* DrillActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECA0AA7A4B0E79A454CA972 /* DrillActivityAttributes.swift */; };
+		A4EC8199B940FF1B9F222810 /* PokerCourse in Frameworks */ = {isa = PBXBuildFile; productRef = 862F7A86213EB7BB75AE42A0 /* PokerCourse */; };
 		A781F89C36E6AC206979D04E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49C6F7BE4FDC633F5B0302E4 /* Models.swift */; };
 		AD1F336CCAAAE1D4DBE4F2CB /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1587A17533DC86F80C6862E7 /* AppGroup.swift */; };
 		AEB30FC2F2C52612DF026715 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1587A17533DC86F80C6862E7 /* AppGroup.swift */; };
@@ -46,6 +47,7 @@
 		DD3674D9BCBFC7C11A4D8CC2 /* PokerLabWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54C0CB7C6BD879B49D0372B9 /* PokerLabWidgets.swift */; };
 		E5E9A0A28A671A953FFB279B /* LessonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E771F1569418889BFD5C51D /* LessonView.swift */; };
 		EC4BA623875AD3C4DD40E522 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A26AB178F21365BC5671C5E /* ProfileView.swift */; };
+		EF34F60F9A4110A2500AB01E /* CourseBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E40AF67000D72D5ADE5774F /* CourseBridge.swift */; };
 		F59224A6C54C13165A45AF16 /* DrillActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = CECA0AA7A4B0E79A454CA972 /* DrillActivityAttributes.swift */; };
 		F7261046F371678CBBCFDF02 /* DrillSessionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA7A5DC7F6AAA35D11F987C8 /* DrillSessionModel.swift */; };
 		FFED865244DDD3771D086333 /* CardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F12EEB5D3A043F1C087F96D /* CardView.swift */; };
@@ -106,6 +108,7 @@
 		77C10CC3CAEE378F4E537966 /* DrillLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillLiveActivity.swift; sourceTree = "<group>"; };
 		78A9D264BAE4E4A3D3BB2994 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7B848C861C60446F54668545 /* EquityLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquityLabView.swift; sourceTree = "<group>"; };
+		7E40AF67000D72D5ADE5774F /* CourseBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CourseBridge.swift; sourceTree = "<group>"; };
 		812622AA395B79754E3D0898 /* PracticeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeView.swift; sourceTree = "<group>"; };
 		97FB70E960CA3BF56026CD28 /* LearnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearnView.swift; sourceTree = "<group>"; };
 		9D882C4374BD6DAE973704EF /* CardScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScanner.swift; sourceTree = "<group>"; };
@@ -144,6 +147,7 @@
 				476D243B3791B9CF6A0810C6 /* PokerSolver in Frameworks */,
 				CDAC9340438630653CEA42CF /* PokerTraining in Frameworks */,
 				B386BC8DE7423AAD69B305AC /* CardRecognitionCore in Frameworks */,
+				A4EC8199B940FF1B9F222810 /* PokerCourse in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +189,7 @@
 		2C977578C36019D4BB7A203E /* Learn */ = {
 			isa = PBXGroup;
 			children = (
+				7E40AF67000D72D5ADE5774F /* CourseBridge.swift */,
 				97FB70E960CA3BF56026CD28 /* LearnView.swift */,
 				2E771F1569418889BFD5C51D /* LessonView.swift */,
 			);
@@ -380,6 +385,7 @@
 				CF13FEE731E2203F003F02DB /* PokerSolver */,
 				99C8C905AEEF7C9EC4333567 /* PokerTraining */,
 				1E2C9030BCCE7AB4ABD4A96D /* CardRecognitionCore */,
+				862F7A86213EB7BB75AE42A0 /* PokerCourse */,
 			);
 			productName = PokerLab;
 			productReference = E0AAC87391A92417D14AE545 /* PokerLab.app */;
@@ -505,6 +511,7 @@
 				83692A9BFDE1B6BD7BB1FC11 /* CardScanner.swift in Sources */,
 				FFED865244DDD3771D086333 /* CardView.swift in Sources */,
 				C6CAA8FEC861F7FA65B106EE /* Components.swift in Sources */,
+				EF34F60F9A4110A2500AB01E /* CourseBridge.swift in Sources */,
 				991D9F0E59A4C09F1B57E8A5 /* DrillActivityAttributes.swift in Sources */,
 				F7261046F371678CBBCFDF02 /* DrillSessionModel.swift in Sources */,
 				09CAC5CC1A9848E2146C6C36 /* DrillSessionView.swift in Sources */,
@@ -849,6 +856,10 @@
 		83BADCE3B31CF4C4503CFFF5 /* PokerCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PokerCore;
+		};
+		862F7A86213EB7BB75AE42A0 /* PokerCourse */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PokerCourse;
 		};
 		94DD456785DEDD6A72D0CDD9 /* PokerCore */ = {
 			isa = XCSwiftPackageProductDependency;

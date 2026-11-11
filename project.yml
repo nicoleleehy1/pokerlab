@@ -36,6 +36,8 @@ targets:
         product: PokerTraining
       - package: PokerEngine
         product: CardRecognitionCore
+      - package: PokerEngine
+        product: PokerCourse
       - target: PokerLabWidgets
     entitlements:
       path: App/PokerLab/PokerLab.entitlements

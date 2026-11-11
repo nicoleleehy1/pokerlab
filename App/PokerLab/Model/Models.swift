@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import PokerCore
 import PokerTraining
+import PokerCourse
 
 // CloudKit-compatible SwiftData schema:
 //  - every stored property has a default value or is optional,
@@ -107,6 +108,30 @@ final class PlayerProfile {
     }
 }
 
+/// A finished course lesson. XP, streaks and the lesson path are derived from these.
+@Model
+final class LessonResult {
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var lessonID: String = ""
+    var correct: Int = 0
+    var total: Int = 0
+    var xp: Int = 0
+    /// Mean EV loss per question as a fraction of the pot (estimates: points / 100).
+    var meanLossFraction: Double = 0
+
+    init(lessonID: String, correct: Int, total: Int, meanLossFraction: Double, date: Date = .now) {
+        self.lessonID = lessonID; self.correct = correct; self.total = total
+        self.meanLossFraction = meanLossFraction; self.date = date
+        xp = XP.forLesson(correct: correct, total: total)
+    }
+
+    var record: LessonRecord {
+        LessonRecord(lessonID: lessonID, day: DailyDrill.dayNumber(for: date), correct: correct, total: total)
+    }
+}
+
 enum PokerLabSchema {
-    static let models: [any PersistentModel.Type] = [TrainingSession.self, DrillAttempt.self, SavedSpot.self, PlayerProfile.self]
+    static let models: [any PersistentModel.Type] = [TrainingSession.self, DrillAttempt.self, SavedSpot.self, PlayerProfile.self,
+                                                     LessonResult.self]
 }

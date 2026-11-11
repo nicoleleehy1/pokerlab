@@ -46,6 +46,10 @@ final class LearnFlowUITests: XCTestCase {
         XCTAssertTrue(element("lesson-summary").exists, "no summary after \(answered) questions")
         element("lesson-done").tap()
         XCTAssertTrue(element("continue-lesson").waitForExistence(timeout: 10))
+        // The finished lesson is now done and earned XP toward the daily goal.
+        XCTAssertTrue(app.buttons["Practise again"].waitForExistence(timeout: 5))
+        XCTAssertFalse(element("daily-goal").label.contains(", 0 of 50 XP"), element("daily-goal").label)
+        snapshot("learn-after")
     }
 
     func testTabScreenshots() {

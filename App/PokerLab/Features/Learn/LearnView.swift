@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import PokerCore
 import PokerTraining
+import PokerCourse
 
 /// One row of the lesson path.
 struct PathLesson: Identifiable, Hashable {
@@ -13,40 +14,44 @@ struct PathLesson: Identifiable, Hashable {
 }
 
 /// Learn tab from docs/design/Main.dc.html: streak pill, daily goal, unit header and the lesson
-/// path with done / current / locked lessons.
+/// path with done / current / locked lessons, driven by the PokerCourse curriculum.
 struct LearnView: View {
-    @Query(sort: \DrillAttempt.date, order: .reverse) private var attempts: [DrillAttempt]
-    @State private var activeLesson: PathLesson?
+    @Environment(\.modelContext) private var context
+    @Query(sort: \LessonResult.date) private var results: [LessonResult]
+    @Query private var attempts: [DrillAttempt]
+    @State private var activeLesson: Lesson?
+    @State private var selectedUnit: Int?
 
-    private let dailyGoal = 5
-    private var dayStreak: Int {
-        let days = Set(attempts.map { DailyDrill.dayNumber(for: $0.date) })
-        return DailyStreak.current(days: days, today: DailyDrill.dayNumber())
-    }
-    private var todayCount: Int { attempts.filter { Calendar.current.isDateInToday($0.date) }.count }
-
-    private var lessons: [PathLesson] {
-        [
-            PathLesson(id: "equity-1", title: "Hand vs hand", meta: "10 questions · about 4 min", status: .current),
-            PathLesson(id: "equity-2", title: "Hand vs range", meta: "10 questions", status: .locked),
-            PathLesson(id: "equity-3", title: "Draws on the flop", meta: "10 questions", status: .locked),
-        ]
+    private var progress: CourseProgress {
+        CourseProgress(records: results.map(\.record),
+                       extraActiveDays: Set(attempts.map { DailyDrill.dayNumber(for: $0.date) }),
+                       today: DailyDrill.dayNumber())
     }
 
     var body: some View {
+        let progress = self.progress
+        let path = progress.path()
+        let unit = Curriculum.units.first { $0.number == selectedUnit } ?? progress.currentUnit()
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     ScreenHeader(overline: Date.now.formatted(.dateTime.weekday(.wide)), title: "Learn") {
-                        Pill(symbol: "flame", text: "\(dayStreak) day streak")
+                        Pill(symbol: "flame", text: "\(progress.streak) day streak")
                             .accessibilityIdentifier("streak-pill")
                     }
-                    dailyGoalCard
+                    dailyGoalCard(progress)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Unit 2").eyebrowStyle()
-                        Text("Equity vs ranges").font(Theme.sectionTitle).tracking(-0.2).accessibilityAddTraits(.isHeader)
+                        Text("Unit \(unit.number)").eyebrowStyle()
+                        Text(unit.title).font(Theme.sectionTitle).tracking(-0.2).accessibilityAddTraits(.isHeader)
+                        Text(unit.summary).font(Theme.caption).foregroundStyle(Theme.muted).padding(.top, 2)
                     }
-                    LessonPath(lessons: lessons) { activeLesson = $0 }
+                    LessonPath(lessons: path.filter { $0.unit == unit.number }.map { item in
+                        PathLesson(id: item.id, title: item.lesson.title, meta: meta(item, unit: unit),
+                                   status: item.status == .done ? .done : item.status == .current ? .current : .locked)
+                    }) { tapped in
+                        activeLesson = Curriculum.lesson(tapped.id)
+                    }
+                    unitList(progress: progress, path: path, showing: unit.number)
                 }
                 .screenPadding()
                 .padding(.top, 16)
@@ -55,23 +60,64 @@ struct LearnView: View {
             .background(Theme.background)
             .toolbar(.hidden, for: .navigationBar)
             .fullScreenCover(item: $activeLesson) { lesson in
-                LessonView(runner: LessonRunner(title: lesson.title) { try await SampleLessons.equityQuestions() })
+                LessonView(runner: LessonRunner(title: lesson.title) { try await Curriculum.lessonQuestions(lesson) }) { outcome in
+                    save(outcome, lesson: lesson)
+                }
             }
         }
     }
 
-    private var dailyGoalCard: some View {
+    private func meta(_ item: CourseProgress.PathItem, unit: CourseUnit) -> String {
+        switch item.status {
+        case .done: "Completed · \(Theme.percent(item.bestAccuracy ?? 0, digits: 0)) accuracy"
+        case .current: "\(item.lesson.questionCount) questions · about 4 min"
+        case .locked: unit.isAvailable ? "\(item.lesson.questionCount) questions" : "Unlocks with the river solver"
+        }
+    }
+
+    private func save(_ outcome: LessonOutcome, lesson: Lesson) {
+        guard outcome.total > 0 else { return }
+        context.insert(LessonResult(lessonID: lesson.id, correct: outcome.correct, total: outcome.total,
+                                    meanLossFraction: outcome.meanLossFraction))
+        try? context.save()
+        selectedUnit = nil
+    }
+
+    private func dailyGoalCard(_ p: CourseProgress) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Daily goal").font(Theme.label)
                 Spacer()
-                Text("\(min(todayCount, dailyGoal)) of \(dailyGoal) drills").font(Theme.caption.monospacedDigit()).foregroundStyle(Theme.muted)
+                Text("\(min(p.xpToday, p.dailyGoalXP)) of \(p.dailyGoalXP) XP").font(Theme.caption.monospacedDigit()).foregroundStyle(Theme.muted)
             }
-            ProgressTrack(value: Double(todayCount) / Double(dailyGoal))
+            ProgressTrack(value: Double(p.xpToday) / Double(p.dailyGoalXP))
                 .accessibilityLabel("Daily goal")
         }
         .panel()
         .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("daily-goal")
+    }
+
+    private func unitList(progress: CourseProgress, path: [CourseProgress.PathItem], showing: Int) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Course").eyebrowStyle()
+            RowGroup {
+                ForEach(Curriculum.units) { unit in
+                    let items = path.filter { $0.unit == unit.number }
+                    let done = items.filter { $0.status == .done }.count
+                    Button { selectedUnit = unit.number } label: {
+                        ListRow(symbol: unit.isAvailable ? (done == items.count ? "checkmark.circle" : "circle") : "lock",
+                                title: "\(unit.number). \(unit.title)",
+                                subtitle: unit.isAvailable ? "\(done) of \(items.count) lessons" : "Needs the river solver",
+                                showsChevron: unit.number != showing)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(unit.number == showing ? .isSelected : [])
+                    .accessibilityIdentifier("unit-\(unit.number)")
+                }
+            }
+            Text("\(progress.totalXP) XP total").font(Theme.caption.monospacedDigit()).foregroundStyle(Theme.muted)
+        }
     }
 }
 
@@ -105,6 +151,10 @@ struct LessonPath: View {
                             .buttonStyle(.compactPrimary)
                             .padding(.top, 12)
                             .accessibilityIdentifier("continue-lesson")
+                        } else if lesson.status == .done {
+                            Button("Practise again") { start(lesson) }
+                                .buttonStyle(OutlineButtonStyle(height: 32))
+                                .padding(.top, 8)
                         }
                     }
                     .padding(.top, 4)
@@ -134,37 +184,5 @@ struct LessonPath: View {
             Circle().strokeBorder(Theme.border, lineWidth: 1).frame(width: 32, height: 32)
                 .overlay(Image(systemName: "lock").font(.system(size: 12)).foregroundStyle(Theme.faint))
         }
-    }
-}
-
-/// Equity questions with four choices, built from the Equity Quiz generator.
-enum SampleLessons {
-    static func equityQuestions(count: Int = 10, seed: UInt64 = UInt64.random(in: 1...UInt64.max)) async throws -> [LessonQuestionData] {
-        var out: [LessonQuestionData] = []
-        for i in 0..<count {
-            let category = EquityQuiz.categories[i % EquityQuiz.categories.count]
-            let spot = EquityQuiz.generate(category, seed: seed &+ UInt64(i))
-            let truth = try await spot.solve()
-            let options = choices(around: truth, seed: seed &+ UInt64(i))
-            let correct = options.indices.min { abs(options[$0] - truth) < abs(options[$1] - truth) }!
-            out.append(LessonQuestionData(
-                id: i, topic: category.title,
-                prompt: spot.villain == nil ? "How often does your hand win against theirs?" : "How often does your hand win against this range?",
-                heroCards: [spot.hero.high, spot.hero.low],
-                villainCards: spot.villainHand.map { [$0.high, $0.low] } ?? [],
-                board: spot.board.sortedForDisplay,
-                facts: spot.villain.map { [.init(label: "Villain", value: $0.name)] } ?? [],
-                options: options.map { Theme.percent($0, digits: 0) }, correct: [correct],
-                explanation: "Your equity is \(Theme.percent(truth)) (\(spot.board.count < 3 ? "every board enumerated" : "exact"))."))
-        }
-        return out
-    }
-
-    /// Four answers at least 10 points apart, one of them within 5 points of the truth.
-    static func choices(around truth: Double, seed: UInt64) -> [Double] {
-        var rng = Xoshiro256(seed: seed)
-        let slot = Int(rng.next(below: 4))
-        let start = min(max((truth * 100).rounded() - Double(slot) * 13, 2), 98 - 39)
-        return (0..<4).map { (start + Double($0) * 13) / 100 }
     }
 }
