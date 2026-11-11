@@ -14,7 +14,7 @@ struct DrillSessionView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 header
                 switch model.phase {
                 case .loading:
@@ -25,10 +25,11 @@ struct DrillSessionView: View {
                     summary
                 }
             }
-            .padding()
+            .screenPadding()
+            .padding(.vertical, 16)
         }
-        .background(Color(.systemGroupedBackground))
-        .navigationTitle(model.isDaily ? "Daily Drill" : model.kind.title)
+        .background(Theme.background)
+        .navigationTitle(model.isDaily ? "Daily Spot" : model.kind.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if model.phase != .finished {
@@ -44,12 +45,12 @@ struct DrillSessionView: View {
 
     private var header: some View {
         HStack {
-            Text(model.progressText).font(Theme.smallNumber).foregroundStyle(.secondary)
+            Text(model.progressText).font(Theme.smallNumber).foregroundStyle(Theme.muted)
                 .accessibilityLabel("Question \(model.progressText)")
             Spacer()
             Label("\(model.tally.streak)", systemImage: "flame")
                 .font(Theme.smallNumber)
-                .foregroundStyle(model.tally.streak > 0 ? .orange : .secondary)
+                .foregroundStyle(model.tally.streak > 0 ? Theme.ink : Theme.muted)
                 .contentTransition(.numericText(value: Double(model.tally.streak)))
                 .accessibilityLabel("Streak \(model.tally.streak)")
             Label("\(model.tally.points)", systemImage: "star")
@@ -71,37 +72,25 @@ struct DrillSessionView: View {
             Button {
                 model.next()
             } label: {
-                Text(model.tally.attempts >= model.length ? "See results" : "Next spot").frame(maxWidth: .infinity)
+                Text(model.tally.attempts >= model.length ? "See results" : "Next spot")
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(.primary)
             .accessibilityIdentifier("next-spot")
         }
     }
 
     private var summary: some View {
-        VStack(spacing: 16) {
-            Image(systemName: model.tally.accuracy >= 0.7 ? "checkmark.seal.fill" : "chart.bar.fill")
-                .font(.system(size: 56)).foregroundStyle(.tint).accessibilityHidden(true)
-            Text("Session complete").font(.title2.bold())
-            HStack(spacing: 24) {
-                tile("Accuracy", Theme.percent(model.tally.accuracy, digits: 0))
-                tile("Points", "\(model.tally.points)")
-                tile("Best streak", "\(model.tally.bestStreak)")
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Session complete").font(Theme.sectionTitle).accessibilityAddTraits(.isHeader)
+            HStack(spacing: 12) {
+                StatTile(title: "Accuracy", value: Theme.percent(model.tally.accuracy, digits: 0))
+                StatTile(title: "Points", value: "\(model.tally.points)")
+                StatTile(title: "Best streak", value: "\(model.tally.bestStreak)")
             }
-            Button("Done") { dismiss() }.buttonStyle(.borderedProminent).accessibilityIdentifier("session-done")
+            Button("Done") { dismiss() }.buttonStyle(.primary).accessibilityIdentifier("session-done")
         }
-        .panel()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session-summary")
-    }
-
-    private func tile(_ label: String, _ value: String) -> some View {
-        VStack {
-            Text(value).font(Theme.mediumNumber)
-            Text(label).font(.caption).foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -113,23 +102,24 @@ private struct QuizCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(spot.category.title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(spot.category.title).eyebrowStyle()
             SpotCards(hero: spot.hero, villainHand: spot.villainHand, villainName: spot.villain?.name, board: spot.board)
-            Text("What is your equity?").font(.headline)
+            Text("What is your equity?").font(Theme.label)
             VStack(spacing: 4) {
                 Text(Theme.percent(model.guess, digits: 0))
                     .font(Theme.bigNumber)
-                    .foregroundStyle(Theme.hero)
+                    .foregroundStyle(Theme.ink)
                     .contentTransition(.numericText(value: model.guess))
                     .frame(maxWidth: .infinity)
                 Slider(value: $model.guess, in: 0...1, step: 0.01) { Text("Your equity guess") }
+                    .tint(Theme.ink)
                     .disabled(model.phase != .question)
                     .accessibilityValue(Theme.percent(model.guess, digits: 0))
                     .accessibilityIdentifier("equity-slider")
             }
             if model.phase == .question {
-                Button { Task { await model.submitGuess() } } label: { Text("Lock in").frame(maxWidth: .infinity) }
-                    .buttonStyle(.borderedProminent).controlSize(.large)
+                Button { Task { await model.submitGuess() } } label: { Text("Lock in") }
+                    .buttonStyle(.primary)
                     .accessibilityIdentifier("submit-answer")
             } else if let g = model.grade, let t = model.truth {
                 ResultBanner(grade: g, detail: "True equity \(Theme.percent(t)). You were \(String(format: "%.1f", g.errorPoints)) points away.")
@@ -147,7 +137,7 @@ private struct PotOddsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(spot.category.title.uppercased()).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(spot.category.title).eyebrowStyle()
             SpotCards(hero: spot.hero, villainHand: nil, villainName: spot.villain.name, board: spot.board)
             HStack(spacing: 24) {
                 labeled("Pot", "\(spot.pot.formatted()) bb")
@@ -157,9 +147,9 @@ private struct PotOddsCard: View {
             if model.phase == .question {
                 HStack {
                     Button { Task { await model.submitDecision(call: false) } } label: { Text("Fold").frame(maxWidth: .infinity) }
-                        .buttonStyle(.bordered).controlSize(.large).accessibilityIdentifier("fold")
-                    Button { Task { await model.submitDecision(call: true) } } label: { Text("Call").frame(maxWidth: .infinity) }
-                        .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("call")
+                        .buttonStyle(OutlineButtonStyle(height: 52)).accessibilityIdentifier("fold")
+                    Button { Task { await model.submitDecision(call: true) } } label: { Text("Call") }
+                        .buttonStyle(.primary).accessibilityIdentifier("call")
                 }
             } else if let g = model.grade, let t = model.truth {
                 let ev = spot.callEV(equity: t)
@@ -171,7 +161,7 @@ private struct PotOddsCard: View {
 
     private func labeled(_ l: String, _ v: String) -> some View {
         VStack(alignment: .leading) {
-            Text(l).font(.caption).foregroundStyle(.secondary)
+            Text(l).font(Theme.caption).foregroundStyle(Theme.muted)
             Text(v).font(Theme.smallNumber)
         }
         .accessibilityElement(children: .combine)
@@ -186,24 +176,24 @@ private struct RangeTrainerCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(spot.prompt).font(.headline)
-            Text("Tap or drag to paint. Heads-up, 0.5/1 blinds, no ante.").font(.footnote).foregroundStyle(.secondary)
+            Text(spot.prompt).font(Theme.label)
+            Text("Tap or drag to paint. Heads-up, 0.5/1 blinds, no ante.").font(Theme.caption).foregroundStyle(Theme.muted)
             RangeGridView(values: values, editable: model.phase == .question, outline: outline) { hc, on in
                 if on { model.painted.insert(hc) } else { model.painted.remove(hc) }
             }
             HStack {
                 Text("\(model.painted.reduce(0) { $0 + $1.comboCount }) combos, \(Theme.percent(Double(model.painted.reduce(0) { $0 + $1.comboCount }) / 1326))")
-                    .font(Theme.smallNumber).foregroundStyle(.secondary)
+                    .font(Theme.smallNumber).foregroundStyle(Theme.muted)
                 Spacer()
                 if model.phase == .question {
-                    Button("Clear") { model.painted = [] }.disabled(model.painted.isEmpty)
+                    Button("Clear") { model.painted = [] }.buttonStyle(.outline).disabled(model.painted.isEmpty)
                 }
             }
             if model.phase == .question {
-                Button { Task { await model.submitRange() } } label: { Text("Check against Nash").frame(maxWidth: .infinity) }
-                    .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("submit-range")
+                Button { Task { await model.submitRange() } } label: { Text("Check against Nash") }
+                    .buttonStyle(.primary).accessibilityIdentifier("submit-range")
             } else if let g = model.grade, let c = model.comparison {
-                ResultBanner(grade: g, detail: "\(Theme.percent(c.accuracy)) of combos match. Missed \(c.missed.count) hands, \(c.extra.count) extra. Orange outlines are misses, red outlines are extras.")
+                ResultBanner(grade: g, detail: "\(Theme.percent(c.accuracy)) of combos match. Missed \(c.missed.count) hands, \(c.extra.count) extra. Ink outlines are hands you missed, red outlines are extras.")
             }
         }
         .panel()
@@ -221,8 +211,8 @@ private struct RangeTrainerCard: View {
 
     private func outline(_ hc: HandClass) -> Color? {
         guard model.phase == .answered, let c = model.comparison else { return nil }
-        if c.missed.contains(hc) { return .orange }
-        if c.extra.contains(hc) { return .red }
+        if c.missed.contains(hc) { return Theme.ink }
+        if c.extra.contains(hc) { return Theme.red }
         return nil
     }
 }
@@ -239,22 +229,22 @@ struct SpotCards: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 18) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("You").font(.caption).foregroundStyle(Theme.hero)
+                    Text("You").font(Theme.caption).foregroundStyle(Theme.muted)
                     HStack(spacing: 4) { CardView(card: hero.high); CardView(card: hero.low) }
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Villain").font(.caption).foregroundStyle(.secondary)
+                    Text("Villain").font(Theme.caption).foregroundStyle(Theme.muted)
                     if let v = villainHand {
                         HStack(spacing: 4) { CardView(card: v.high); CardView(card: v.low) }
                     } else {
-                        Text(villainName ?? "Range").font(.subheadline.weight(.medium))
+                        Text(villainName ?? "Range").font(Theme.label)
                             .padding(.vertical, 8)
                     }
                 }
             }
             if !board.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Board").font(.caption).foregroundStyle(.secondary)
+                    Text("Board").font(Theme.caption).foregroundStyle(Theme.muted)
                     HStack(spacing: 4) { ForEach(Array(board.sortedForDisplay), id: \.self) { CardView(card: $0, baseWidth: 40) } }
                 }
             }
@@ -268,19 +258,21 @@ struct ResultBanner: View {
     let detail: String
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: grade.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .font(.title2)
-                .foregroundStyle(grade.isCorrect ? .green : .orange)
+            Image(systemName: grade.isCorrect ? "checkmark.circle" : "xmark.circle")
+                .font(.title3)
+                .foregroundStyle(Theme.ink)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(grade.verdict.title).font(.headline)
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
-                Text("+\(grade.points) points").font(Theme.smallNumber)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(grade.verdict.title).font(.system(.subheadline, weight: .semibold))
+                Text(detail).font(Theme.caption).foregroundStyle(Theme.body).fixedSize(horizontal: false, vertical: true)
+                Text("+\(grade.points) points").font(Theme.smallNumber).foregroundStyle(Theme.muted)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background((grade.isCorrect ? Color.green : Color.orange).opacity(0.12), in: .rect(cornerRadius: 12))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Theme.wash, in: .rect(cornerRadius: Theme.cardRadius))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardRadius).strokeBorder(Theme.border, lineWidth: 1))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("result-banner")
         .transition(.opacity)

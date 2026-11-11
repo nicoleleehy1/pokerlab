@@ -41,16 +41,16 @@ struct RangeGridView: View {
     private func cell(_ hc: HandClass, side: CGFloat) -> some View {
         let v = values[hc.index]
         return ZStack {
-            Rectangle().fill(Color(.tertiarySystemFill))
+            Rectangle().fill(Theme.subtle)
             Rectangle().fill(tint.opacity(0.15 + 0.85 * v)).opacity(v > 0.001 ? 1 : 0)
             if let color = outline(hc) {
                 Rectangle().strokeBorder(color, lineWidth: 2)
             }
             if !typeSize.isAccessibilitySize {
                 Text(hc.description.replacingOccurrences(of: "o", with: ""))
-                    .font(.system(size: side * 0.32, weight: .medium, design: .rounded))
+                    .font(.system(size: side * 0.32, weight: .medium))
                     .minimumScaleFactor(0.5)
-                    .foregroundStyle(v > 0.5 ? Color.white : Color.primary)
+                    .foregroundStyle(v > 0.5 ? Theme.onInk : Theme.ink)
             }
         }
         .frame(width: side - 1, height: side - 1)

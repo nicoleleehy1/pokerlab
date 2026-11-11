@@ -119,3 +119,115 @@ test suite; AA vs KK averages to 81.95%.
 | CPU: scalar loops -> SIMD16 fused matrix-vector + vectorised regret updates (1 thread) | 2,328 ms | 517 ms |
 | CPU: SIMD16, one task per stack depth (11 tasks) | 517 ms | 88 ms |
 | Metal: v1 row-per-thread -> v2 SIMD-group rows with `simd_sum` | 203 ms | 79 ms |
+
+## Toy games: CFR on Kuhn poker
+
+`swift run -c release PokerBench toy`:
+
+```
+Toy games (Kuhn poker, target |value + 1/18| < 1e-4 and exploitability < 1e-4)
+CFR                   : 7390 iterations, 34.75 ms solve time (excluding checks)
+CFR+                  : 360 iterations, 1.31 ms solve time (excluding checks)
+DCFR (1.5, 0, 2)      : 910 iterations, 3.11 ms solve time (excluding checks)
+```
+
+- Tabular CFR with alternating updates over the full Kuhn tree (12 infosets, 24 actions).
+  Exploitability is an exact best response, checked every 10 iterations (not timed), so
+  iteration counts are rounded up to the next multiple of 10.
+- On this tiny game CFR+ needs fewer iterations than DCFR. DCFR's advantage reported by
+  Brown & Sandholm shows up on poker trees with large mistakes (see the push/fold and river
+  sections), not necessarily on Kuhn.
+- The test suite checks all three variants reach the value -1/18 and exploitability below
+  1e-3 after 20,000 iterations, and the clairvoyance game matches its closed form
+  (value (1 + 2s) / (2 (1 + s)), bluff s/(1+s), call 1/(1+s)) for s = 0.5, 1, 2.
+
+## Discounted CFR vs CFR+ on push/fold
+
+`swift run -c release PokerBench dcfr` (both algorithms run 5,000 iterations on each of 40
+stack depths, 1.0 to 20.5 bb; exploitability is measured exactly every 10 iterations):
+
+```
+Push/fold iterations to reach exploitability targets (mbb/hand), 40 stack depths, checked every 10 iterations
+CFR+                 | < 1.0: median 40, mean 44, worst 50 (40/40) | < 0.1: median 140, mean 138, worst 180 (40/40) | < 0.01: median 450, mean 446, worst 620 (40/40) | wall incl. checks 0.61 s
+DCFR(1.5, 0.0, 2.0)  | < 1.0: median 20, mean 20, worst 20 (40/40) | < 0.1: median 40, mean 44, worst 60 (40/40) | < 0.01: median 100, mean 99, worst 140 (40/40) | wall incl. checks 0.63 s
+```
+
+| Target (mbb/hand) | CFR+ mean iterations | DCFR mean iterations | Reduction |
+|---|---|---|---|
+| 1.0 | 44 | 20 | 2.2x |
+| 0.1 | 138 | 44 | 3.1x |
+| 0.01 | 446 | 99 | 4.5x |
+
+- DCFR uses the paper's recommended (α, β, γ) = (1.5, 0, 2): positive regrets scaled by
+  t^1.5/(t^1.5+1), negative regrets halved each iteration, strategy sums discounted by
+  (t/(t+1))^2. It is a CPU option (scalar and SIMD backends); the Metal kernels stay CFR+.
+- Cost per iteration is the same for both, so the reduction in iterations is also the
+  reduction in solve time (the "wall incl. checks" column covers all 5,000 iterations plus
+  500 exploitability checks per depth, so it is not a time-to-target figure).
+- The reduction is in line with the 2-3x Brown & Sandholm report for CFR+ vs DCFR, and larger
+  at tight targets. Push/fold trees contain costly mistakes (folding aces, calling with 72o),
+  where CFR+ is known to be slow.
+
+## River solver (full-range, on-device CPU)
+
+`swift run -c release PokerBench river <n>`, one process per spot so the peak footprint
+belongs to that spot alone. Pot 10, 100 behind, bets of 33%/75% pot (1 size: 75%;
+3 sizes: 33%/75%/150%), raises of 75% of the pot after calling, all-in always available,
+at most 3 bets/raises. DCFR(1.5, 0, 2), single thread, exploitability (exact best response)
+checked every 10 iterations and not counted in "solve":
+
+```
+Full ranges, Ks9h5c4d2s, 2 sizes: hands 1081/1081 (canonical 1081/1081), 24 decision nodes, tables 0.56 MB
+   180 iterations, exploitability 0.291% pot, solve 204.7 ms, setup 34.5 ms, wall incl. checks 260.9 ms, process peak footprint 6.8 MB
+Full ranges, Qh8c7c3d2s, 2 sizes: hands 1081/1081 (canonical 1081/1081), 24 decision nodes, tables 0.56 MB
+   190 iterations, exploitability 0.272% pot, solve 206.3 ms, setup 20.2 ms, wall incl. checks 248.5 ms, process peak footprint 6.8 MB
+Full ranges, 2c7c9cJdKd (iso), 2 sizes: hands 1081/1081 (canonical 652/652), 24 decision nodes, tables 0.34 MB
+   180 iterations, exploitability 0.296% pot, solve 159.6 ms, setup 19.3 ms, wall incl. checks 195.5 ms, process peak footprint 6.8 MB
+Full ranges, Ks9h5c4d2s, 1 size: hands 1081/1081 (canonical 1081/1081), 8 decision nodes, tables 0.17 MB
+   140 iterations, exploitability 0.273% pot, solve 45.8 ms, setup 19.3 ms, wall incl. checks 70.1 ms, process peak footprint 6.7 MB
+Full ranges, Ks9h5c4d2s, 3 sizes: hands 1081/1081 (canonical 1081/1081), 32 decision nodes, tables 0.76 MB
+   190 iterations, exploitability 0.288% pot, solve 279.3 ms, setup 20.5 ms, wall incl. checks 329.7 ms, process peak footprint 6.8 MB
+BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: hands 536/335 (canonical 536/335), 24 decision nodes, tables 0.23 MB
+   200 iterations, exploitability 0.300% pot, solve 93.9 ms, setup 18.7 ms, wall incl. checks 122.5 ms, process peak footprint 6.7 MB
+```
+
+| Spot | Hands (OOP/IP) | Iterations to ≤ 0.3% pot | Solve time | Peak footprint |
+|---|---|---|---|---|
+| Any two cards, 1 size | 1081 / 1081 | 140 | 45.8 ms | 6.7 MB |
+| Any two cards, 2 sizes (two boards) | 1081 / 1081 | 180-190 | 205-206 ms | 6.8 MB |
+| Any two cards, 2 sizes, suit-isomorphic board | 652 / 652 canonical | 180 | 159.6 ms | 6.8 MB |
+| Any two cards, 3 sizes | 1081 / 1081 | 190 | 279.3 ms | 6.8 MB |
+| BB defend vs BTN open, 2 sizes | 536 / 335 | 200 | 93.9 ms | 6.7 MB |
+
+- **Machine:** the MacBook Pro M3 Pro above, release build, one thread. **iPhone numbers
+  are not measured yet** (they need a device and a signing team). The research doc's
+  estimate for an A17/A18 was 0.1-1 s for 1,000 iterations; this solver needs under 200
+  iterations for 0.3% of the pot.
+- **Peak footprint** is the whole benchmark process (`ri_lifetime_max_phys_footprint`, the
+  figure iOS jetsam limits apply to). The solver's own regret and strategy tables are
+  0.17-0.76 MB; the rest is the binary, evaluator tables and runtime.
+- **How it's fast:** hand strengths are computed once (the board is fixed), showdowns are an
+  O(n) two-pointer sweep with per-card blocker sums for card removal, folds use the same
+  blocker sums, and regret matching and the DCFR updates run eight hands at a time on
+  SIMD8. On boards where suits are interchangeable (here: hearts and spades), suit
+  isomorphism cuts the hand list from 1,081 to 652 and solve time by 22%.
+- **Correctness checks (in `swift test`):** the clairvoyance game for s = 0.5, 1, 2 and an
+  AKQ-style river match their closed forms (bluff s/(1+s), call 1/(1+s), value
+  (1 + 2s)/(2(1 + s)) of the pot); sweep terminal values equal an O(n²) brute force; the
+  isomorphic solve matches the full solve; EVs are zero-sum; sets never fold.
+- In the simulator's Debug build the BB-vs-BTN solve took about 5.5 s. Debug builds the
+  engine without optimisation, so that figure is not a performance number.
+
+## Adaptive layer (FSRS + per-concept Elo): simulated check only
+
+From `swift test` (`eloBeatsConstantBaselineOnHeldOutAnswers`), a simulated learner with
+random per-concept skills and per-template difficulties answering 3,000 questions; Elo
+predictions are made online before each answer and scored on the later half:
+
+```
+Simulated learner, held-out half: Elo log loss 0.5623075698742775, constant baseline 0.6597253645068445, AUC 0.742992119279123
+```
+
+This only shows the model learns what the simulation builds in. The research doc's real
+metric (next-answer AUC and log loss on a past-to-future split of real review logs) needs
+real usage data and has not been measured.

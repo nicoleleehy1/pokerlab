@@ -14,33 +14,34 @@ struct CardView: View {
 
     private var width: CGFloat { min(baseWidth * scale, baseWidth * 2) }
     private var fourColor: Bool { fourColorPreference || differentiateWithoutColor }
+    private var radius: CGFloat { width * 0.17 }
 
     var body: some View {
         ZStack {
             if let card {
-                RoundedRectangle(cornerRadius: width * 0.16, style: .continuous)
-                    .fill(Color(.tertiarySystemBackground))
-                    .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
-                RoundedRectangle(cornerRadius: width * 0.16, style: .continuous)
-                    .strokeBorder(Color(.separator), lineWidth: 0.5)
-                VStack(spacing: -width * 0.06) {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(Theme.background)
+                    .shadow(color: .black.opacity(0.04), radius: 1, y: 1)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(Theme.border, lineWidth: 1)
+                VStack(spacing: width * 0.04) {
                     Text(card.rank.displaySymbol)
-                        .font(.system(size: width * (card.rank == .ten ? 0.40 : 0.48), weight: .semibold, design: .rounded))
+                        .font(.system(size: width * (card.rank == .ten ? 0.36 : 0.42), weight: .semibold))
                     Text(String(card.suit.glyph))
-                        .font(.system(size: width * 0.42))
+                        .font(.system(size: width * 0.34))
                 }
                 .foregroundStyle(card.suit.color(fourColor: fourColor))
                 .minimumScaleFactor(0.5)
             } else {
-                RoundedRectangle(cornerRadius: width * 0.16, style: .continuous)
-                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                    .foregroundStyle(.tertiary)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                    .foregroundStyle(Theme.strongBorder)
                 Image(systemName: "plus")
-                    .font(.system(size: width * 0.3, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: width * 0.28, weight: .regular))
+                    .foregroundStyle(Theme.faint)
             }
         }
-        .frame(width: width, height: width * 1.4)
+        .frame(width: width, height: width * 1.375)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(card?.spokenName ?? placeholder)
     }
@@ -50,13 +51,15 @@ struct CardView: View {
 struct CardSlotsRow: View {
     let cards: [Card?]
     let label: String
+    var baseWidth: CGFloat = 46
+    var spacing: CGFloat = 6
     var onTap: (Int) -> Void
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: spacing) {
             ForEach(cards.indices, id: \.self) { i in
                 Button { onTap(i) } label: {
-                    CardView(card: cards[i], placeholder: "\(label) card \(i + 1), empty")
+                    CardView(card: cards[i], baseWidth: baseWidth, placeholder: "\(label) card \(i + 1), empty")
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint(cards[i] == nil ? "Double-tap to choose a card" : "Double-tap to change this card")
@@ -121,12 +124,13 @@ struct CardPickerSheet: View {
             dismiss()
         } label: {
             VStack(spacing: 0) {
-                Text(card.rank.displaySymbol).font(.system(.callout, design: .rounded, weight: .semibold))
+                Text(card.rank.displaySymbol).font(.system(.callout, weight: .semibold))
                 Text(String(card.suit.glyph)).font(.caption)
             }
             .frame(maxWidth: .infinity, minHeight: 44)
-            .foregroundStyle(disabled ? Color.secondary.opacity(0.4) : card.suit.color(fourColor: fourColor))
-            .background(card == current ? Theme.hero.opacity(0.2) : Color(.tertiarySystemFill), in: .rect(cornerRadius: 6))
+            .foregroundStyle(disabled ? Theme.faint.opacity(0.5) : card.suit.color(fourColor: fourColor))
+            .background(card == current ? Theme.subtle : Theme.background, in: .rect(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(card == current ? Theme.ink : Theme.border, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .disabled(disabled)

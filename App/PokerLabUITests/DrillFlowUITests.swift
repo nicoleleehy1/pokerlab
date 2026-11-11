@@ -18,14 +18,14 @@ final class DrillFlowUITests: XCTestCase {
     }
 
     private func openDrill(_ kind: String) {
-        app.tabBars.buttons["Train"].tap()
+        app.tabBars.buttons["Practice"].tap()
         let row = element("drill-\(kind)")
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
     }
 
     func testTabsExist() {
-        for tab in ["Today", "Lab", "Train", "Progress"] {
+        for tab in ["Learn", "Lab", "Practice", "Profile"] {
             XCTAssertTrue(app.tabBars.buttons[tab].waitForExistence(timeout: 10), "missing tab \(tab)")
         }
     }

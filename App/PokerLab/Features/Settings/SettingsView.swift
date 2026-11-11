@@ -7,7 +7,6 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @AppStorage("fourColorDeck") private var fourColorDeck = false
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
-    @Environment(\.dismiss) private var dismiss
     @Query(sort: \DrillAttempt.date) private var attempts: [DrillAttempt]
     @State private var syncStatus = "Checking…"
 
@@ -41,7 +40,6 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .task { syncStatus = await Self.cloudStatus() }
     }
 
