@@ -140,3 +140,30 @@ DCFR (1.5, 0, 2)      : 910 iterations, 3.11 ms solve time (excluding checks)
 - The test suite checks all three variants reach the value -1/18 and exploitability below
   1e-3 after 20,000 iterations, and the clairvoyance game matches its closed form
   (value (1 + 2s) / (2 (1 + s)), bluff s/(1+s), call 1/(1+s)) for s = 0.5, 1, 2.
+
+## Discounted CFR vs CFR+ on push/fold
+
+`swift run -c release PokerBench dcfr` (both algorithms run 5,000 iterations on each of 40
+stack depths, 1.0 to 20.5 bb; exploitability is measured exactly every 10 iterations):
+
+```
+Push/fold iterations to reach exploitability targets (mbb/hand), 40 stack depths, checked every 10 iterations
+CFR+                 | < 1.0: median 40, mean 44, worst 50 (40/40) | < 0.1: median 140, mean 138, worst 180 (40/40) | < 0.01: median 450, mean 446, worst 620 (40/40) | wall incl. checks 0.61 s
+DCFR(1.5, 0.0, 2.0)  | < 1.0: median 20, mean 20, worst 20 (40/40) | < 0.1: median 40, mean 44, worst 60 (40/40) | < 0.01: median 100, mean 99, worst 140 (40/40) | wall incl. checks 0.63 s
+```
+
+| Target (mbb/hand) | CFR+ mean iterations | DCFR mean iterations | Reduction |
+|---|---|---|---|
+| 1.0 | 44 | 20 | 2.2x |
+| 0.1 | 138 | 44 | 3.1x |
+| 0.01 | 446 | 99 | 4.5x |
+
+- DCFR uses the paper's recommended (α, β, γ) = (1.5, 0, 2): positive regrets scaled by
+  t^1.5/(t^1.5+1), negative regrets halved each iteration, strategy sums discounted by
+  (t/(t+1))^2. It is a CPU option (scalar and SIMD backends); the Metal kernels stay CFR+.
+- Cost per iteration is the same for both, so the reduction in iterations is also the
+  reduction in solve time (the "wall incl. checks" column covers all 5,000 iterations plus
+  500 exploitability checks per depth, so it is not a time-to-target figure).
+- The reduction is in line with the 2-3x Brown & Sandholm report for CFR+ vs DCFR, and larger
+  at tight targets. Push/fold trees contain costly mistakes (folding aces, calling with 72o),
+  where CFR+ is known to be slow.

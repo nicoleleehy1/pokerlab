@@ -8,10 +8,16 @@ import PokerSolver
 struct SolverView: View {
     enum Role: String, CaseIterable, Identifiable { case shove = "SB shove", call = "BB call"; var id: Self { self } }
     enum Backend: String, CaseIterable, Identifiable { case cpu = "CPU (SIMD)", gpu = "GPU (Metal)"; var id: Self { self } }
+    enum Algorithm: String, CaseIterable, Identifiable {
+        case cfrPlus = "CFR+", dcfr = "DCFR"
+        var id: Self { self }
+        var solverAlgorithm: CFRPlusSolver.Algorithm { self == .cfrPlus ? .cfrPlus : .dcfr }
+    }
 
     @State private var stack = 10.0
     @State private var role = Role.shove
     @State private var backend = Backend.cpu
+    @State private var algorithm = Algorithm.dcfr
     @State private var solution: PushFoldSolution?
     @State private var solving = false
     /// Where the last solve actually ran (Metal can fall back to the CPU).
@@ -34,7 +40,7 @@ struct SolverView: View {
         }
         .background(Theme.background)
         .navigationTitle("Push/Fold Solver")
-        .task(id: "\(stack)-\(backend)") { await solve() }
+        .task(id: "\(stack)-\(backend)-\(algorithm)") { await solve() }
     }
 
     private var controls: some View {
@@ -51,6 +57,11 @@ struct SolverView: View {
             Picker("Backend", selection: $backend) { ForEach(Backend.allCases) { Text($0.rawValue).tag($0) } }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("solver-backend")
+            if backend == .cpu {
+                Picker("Algorithm", selection: $algorithm) { ForEach(Algorithm.allCases) { Text($0.rawValue).tag($0) } }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("solver-algorithm")
+            }
             if let ranOn {
                 Text(ranOn).font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("solver-ran-on")
@@ -122,16 +133,18 @@ struct SolverView: View {
         defer { solving = false }
         let stack = self.stack
         let backend = self.backend
+        let algorithm = self.algorithm.solverAlgorithm
         let (result, location): (PushFoldSolution, String) = await Task.detached(priority: .userInitiated) {
             switch backend {
             case .cpu:
-                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10), "Solved on the CPU (SIMD)")
+                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10, algorithm: algorithm),
+                        "Solved on the CPU (SIMD) with \(algorithm == .cfrPlus ? "CFR+" : "Discounted CFR")")
             case .gpu:
                 // Fall back to the CPU solver if Metal is missing or rejects the dispatch
                 // (the iOS Simulator's GPU limits are lower than real hardware).
                 if let gpu = try? MetalCFRSolver(),
                    let solved = try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10).first {
-                    return (solved, "Solved on the GPU (\(gpu.deviceName))")
+                    return (solved, "Solved on the GPU (\(gpu.deviceName)) with CFR+")
                 }
                 return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10),
                         "Metal was unavailable, so this ran on the CPU")

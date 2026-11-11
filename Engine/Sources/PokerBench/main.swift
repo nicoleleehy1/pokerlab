@@ -30,6 +30,7 @@ var checksum: UInt64 = 0
 if mode == "core" || mode == "all" { try await runCore() }
 if mode == "solver" || mode == "all" { try await runSolver() }
 if mode == "toy" || mode == "all" { runToy() }
+if mode == "dcfr" || mode == "all" { await runDCFR() }
 print("")
 print("checksum \(checksum)")
 
@@ -214,5 +215,28 @@ func runToy() {
         } else {
             print("\(name): not reached in 200,000 iterations")
         }
+    }
+}
+
+/// Iterations each algorithm needs to bring push/fold exploitability under a target, checked
+/// every 10 iterations, over 40 stack depths (1.0 to 20.5 bb).
+func runDCFR() async {
+    let stacks = (0..<40).map { 1.0 + 0.5 * Double($0) }
+    let targets = [1.0, 0.1, 0.01]
+    print("\nPush/fold iterations to reach exploitability targets (mbb/hand), 40 stack depths, checked every 10 iterations")
+    for algorithm in [CFRPlusSolver.Algorithm.cfrPlus, .dcfr] {
+        let clock = ContinuousClock()
+        let t0 = clock.now
+        let solutions = await CFRPlusSolver().solve(stacks: stacks, iterations: 5000, checkpointEvery: 10, algorithm: algorithm)
+        let wall = seconds(clock.now - t0)
+        var line = algorithm.name.padding(toLength: 20, withPad: " ", startingAt: 0)
+        for target in targets {
+            let its = solutions.map { s in s.curve.first { $0.exploitability < target }?.iteration }
+            let reached = its.compactMap { $0 }.sorted()
+            let median = reached.isEmpty ? 0 : reached[reached.count / 2]
+            let mean = reached.isEmpty ? 0 : Double(reached.reduce(0, +)) / Double(reached.count)
+            line += " | < \(target): median \(median), mean \(fmt(mean, 0)), worst \(reached.last ?? 0) (\(reached.count)/40)"
+        }
+        print(line + " | wall incl. checks \(fmt(wall, 2)) s")
     }
 }
