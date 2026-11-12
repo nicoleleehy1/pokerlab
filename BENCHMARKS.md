@@ -231,3 +231,17 @@ Simulated learner, held-out half: Elo log loss 0.5623075698742775, constant base
 This only shows the model learns what the simulation builds in. The research doc's real
 metric (next-answer AUC and log loss on a past-to-future split of real review logs) needs
 real usage data and has not been measured.
+
+### Discounted CFR on Metal
+
+Both Metal kernels now take the algorithm as a parameter (CFR+ or DCFR(1.5, 0, 2)).
+`swift run -c release PokerBench dcfr`, same 40 stack depths, exploitability checked every 10 iterations:
+
+```
+Metal CFR+                 | < 1.0: mean 44 (40/40) | < 0.1: mean 138 (40/40) | < 0.01: mean 446 (40/40) | GPU 105.6 ms for 2,000 iterations x 40 depths
+Metal DCFR(1.5, 0.0, 2.0)  | < 1.0: mean 20 (40/40) | < 0.1: mean 44 (40/40) | < 0.01: mean 99 (40/40) | GPU 92.0 ms for 2,000 iterations x 40 depths
+```
+
+The GPU needs exactly the same iterations as the CPU for each target (the kernels compute the
+same updates in Float), so DCFR's 4.5× reduction at 0.01 mbb/hand carries over to Metal. Tests
+check that each kernel's DCFR strategies match the CPU DCFR solver to within 0.01.

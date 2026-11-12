@@ -241,6 +241,20 @@ func runDCFR() async {
         }
         print(line + " | wall incl. checks \(fmt(wall, 2)) s")
     }
+    #if canImport(Metal)
+    if let gpu = try? MetalCFRSolver() {
+        for algorithm in [CFRPlusSolver.Algorithm.cfrPlus, .dcfr] {
+            let sols = try! gpu.solve(stacks: stacks, iterations: 2000, checkpointEvery: 10, algorithm: algorithm)
+            var line = ("Metal " + algorithm.name).padding(toLength: 26, withPad: " ", startingAt: 0)
+            for target in targets {
+                let reached = sols.compactMap { s in s.curve.first { $0.exploitability < target }?.iteration }
+                let mean = reached.isEmpty ? 0 : Double(reached.reduce(0, +)) / Double(reached.count)
+                line += " | < \(target): mean \(fmt(mean, 0)) (\(reached.count)/40)"
+            }
+            print(line + " | GPU \(fmt(sols[0].elapsedSeconds * 1000, 1)) ms for 2,000 iterations x 40 depths")
+        }
+    }
+    #endif
 }
 
 /// Process peak physical footprint (what jetsam limits on iOS), in MB.

@@ -1,6 +1,9 @@
 import Testing
 import PokerCore
 @testable import PokerSolver
+#if canImport(Metal)
+import Metal
+#endif
 
 private let solver = CFRPlusSolver()
 private func hc(_ s: String) -> HandClass { HandClass(s)! }
@@ -118,7 +121,8 @@ struct PushFoldSolverTests {
 
     #if canImport(Metal)
     @Test func metalMatchesCPU() throws {
-        guard let gpu = try? MetalCFRSolver() else { return } // no GPU in this environment
+        guard MTLCreateSystemDefaultDevice() != nil else { return }   // no GPU here
+        let gpu = try MetalCFRSolver() // no GPU in this environment
         let stacks: [Double] = [5, 10, 20]
         for kernel in MetalCFRSolver.Kernel.allCases {
         let g = try gpu.solve(stacks: stacks, iterations: 1000, checkpointEvery: 250, kernel: kernel)
@@ -136,7 +140,8 @@ struct PushFoldSolverTests {
     /// dispatches must still give the same strategies as the CPU.
     @Test("Metal matches CPU with narrow threadgroups", arguments: [32, 64, 256])
     func metalNarrowThreadgroups(_ cap: Int) throws {
-        guard let gpu = try? MetalCFRSolver() else { return }
+        guard MTLCreateSystemDefaultDevice() != nil else { return }   // no GPU here
+        let gpu = try MetalCFRSolver()
         gpu.threadCap = cap
         let g = try gpu.solve(stacks: [10], iterations: 500, checkpointEvery: 500, kernel: .simdGroupRows)
         let c = solver.solve(stack: 10, iterations: 500, checkpointEvery: 500)
