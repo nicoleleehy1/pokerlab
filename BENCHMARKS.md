@@ -299,3 +299,25 @@ Flop, narrow ranges, 1 size: hands 32/37, 47632 decision nodes, 444 chance nodes
 - Flops are the limit. Even narrow ranges with one bet size give 47,632 decision nodes. With
   full ranges and one size, the tables would need over a gigabyte, beyond iOS memory limits.
   That's why the roadmap has a precomputed flop library rather than live full-range flop solves.
+
+## River solver on Metal vs CPU
+
+`swift run -c release PokerBench rivergpu`: 200 DCFR iterations on each backend, no checks timed.
+The Metal backend runs a CPU forward pass (reach vectors), one GPU dispatch that evaluates every
+terminal at once (one thread per terminal and hand, O(n²) with card-removal checks), and a CPU
+backward pass with the same DCFR updates:
+
+```
+Full ranges, Ks9h5c4d2s, 2 sizes: CPU 456.2 ms | Metal 1147.4 ms wall (331.1 ms GPU) | 45 terminals | exploitability difference 0.0029 pp | CPU/Metal 0.40x
+Full ranges, Ks9h5c4d2s, 3 sizes: CPU 343.4 ms | Metal 751.1 ms wall (297.8 ms GPU) | 61 terminals | exploitability difference 0.0012 pp | CPU/Metal 0.46x
+BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: CPU 87.8 ms | Metal 231.8 ms wall (60.6 ms GPU) | 45 terminals | exploitability difference 0.0051 pp | CPU/Metal 0.38x
+```
+
+- **The GPU loses on rivers: the Metal backend runs at 0.38-0.46× the CPU's speed.** GPU compute
+  alone (60-331 ms) is in the CPU's range, but per terminal it does O(n²) work against the CPU's
+  O(n) sort-and-sweep, and every iteration pays two dispatch round-trips plus the CPU passes.
+- Both backends compute the same iterations: exploitability after 200 iterations differs by at
+  most 0.005 percentage points. Tests check GPU vs CPU agreement and the clairvoyance closed form
+  on the GPU.
+- The CPU stays the default. The GPU's best chance is turn trees, with many more terminals per
+  dispatch (see the roadmap).

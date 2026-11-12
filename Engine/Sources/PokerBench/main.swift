@@ -33,6 +33,7 @@ if mode == "solver" || mode == "all" { try await runSolver() }
 if mode == "toy" || mode == "all" { runToy() }
 if mode == "dcfr" || mode == "all" { await runDCFR() }
 if mode == "firstin" || mode == "all" { runFirstIn() }
+if mode == "rivergpu" { runRiverGPU() }
 if mode == "street" { runStreet(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 if mode == "river" || mode == "all" { runRiver(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 print("")
@@ -342,4 +343,20 @@ func runStreet(only: Int?) {
         print("\(entry.name): hands \(h.oop)/\(h.ip), \(solver.decisionNodeCount) decision nodes, \(solver.chanceNodeCount) chance nodes, tables \(fmt(Double(solver.storageBytes) / 1_048_576, 1)) MB")
         print("   \(r.iterations) iterations, exploitability \(fmt(r.exploitability, 3))% pot, solve \(fmt(r.solveSeconds, 2)) s, setup \(fmt(setup * 1000, 0)) ms, peak footprint \(fmt(peakFootprintMB(), 0)) MB")
     }
+}
+
+/// River solver: CPU (SIMD, sort-and-sweep) vs Metal (batched O(n^2) terminals), 200 iterations.
+func runRiverGPU() {
+    #if canImport(Metal)
+    print("\nRiver solver, 200 DCFR iterations: CPU vs Metal backend (no exploitability checks)")
+    for (i, entry) in riverSpots().enumerated() where [0, 4, 5].contains(i) {
+        let cpu = try! RiverSolver(spot: entry.spot), gpuSolver = try! RiverSolver(spot: entry.spot)
+        let gpu = try! MetalRiverBackend(solver: gpuSolver)
+        let clock = ContinuousClock()
+        var t0 = clock.now; cpu.iterate(200); let cpuMs = seconds(clock.now - t0) * 1000
+        t0 = clock.now; gpu.iterate(200); let gpuWall = seconds(clock.now - t0) * 1000
+        let diff = abs(cpu.exploitability() - gpuSolver.exploitability())
+        print("\(entry.name): CPU \(fmt(cpuMs, 1)) ms | Metal \(fmt(gpuWall, 1)) ms wall (\(fmt(gpu.gpuSeconds * 1000, 1)) ms GPU) | \(gpu.terminals.count) terminals | exploitability difference \(String(format: "%.4f", diff)) pp | CPU/Metal \(fmt(cpuMs / gpuWall, 2))x")
+    }
+    #endif
 }
