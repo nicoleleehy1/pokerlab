@@ -272,3 +272,30 @@ iterations. NashConv is the total gain available to players who each switch to a
 - Unit 3's "First in: shove or fold" lesson grades against these charts (800 iterations, cached
   per seat and stack). The 100 bb opening widths in "Position and range width" are still sourced
   figures (Upswing); a full 100 bb six-handed preflop solve is out of scope on device.
+
+## Turn and flop solver (multi-street)
+
+`swift run -c release PokerBench street <n>`, one process per spot. DCFR(1.5, 0, 2), one thread,
+exploitability (exact best response through every runout) checked every 10 iterations and not
+timed. Pot 10; BB defend vs BTN open ranges as in the river section:
+
+```
+Turn, BB vs BTN, 1 size, no raises: hands 543/339, 580 decision nodes, 3 chance nodes, tables 3.9 MB
+   50 iterations, exploitability 0.330% pot, solve 0.73 s, setup 40 ms, peak footprint 11 MB
+Turn, BB vs BTN, 2 sizes + all-in, 1 raise: hands 543/339, 2892 decision nodes, 11 chance nodes, tables 25.9 MB
+   130 iterations, exploitability 0.437% pot, solve 24.85 s, setup 895 ms, peak footprint 35 MB
+Turn, any two cards, 1 size, no raises: hands 1128/1128, 580 decision nodes, 3 chance nodes, tables 10.0 MB
+   40 iterations, exploitability 0.360% pot, solve 3.64 s, setup 44 ms, peak footprint 18 MB
+Flop, narrow ranges, 1 size: hands 32/37, 47632 decision nodes, 444 chance nodes, tables 25.1 MB
+   40 iterations, exploitability 0.493% pot, solve 11.15 s, setup 80 ms, peak footprint 60 MB
+```
+
+- Chance nodes deal every remaining card with equal weight; hands containing the dealt card get
+  zero reach below it, so card removal is exact. Tests check that the solver matches
+  `RiverSolver` on a river board and that its no-betting value equals exact turn equity.
+- A turn with full ranges and one bet size solves in seconds. Richer trees grow fast: two sizes
+  plus all-in and one raise is 5× the nodes and took 24.9 s, because this solver uses plain
+  scalar loops and no suit isomorphism yet (unlike the SIMD river solver).
+- Flops are the limit. Even narrow ranges with one bet size give 47,632 decision nodes. With
+  full ranges and one size, the tables would need over a gigabyte, beyond iOS memory limits.
+  That's why the roadmap has a precomputed flop library rather than live full-range flop solves.
