@@ -321,3 +321,36 @@ BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: CPU 87.8 ms | Metal 231.8 ms wall (60.6 m
   on the GPU.
 - The CPU stays the default. The GPU's best chance is turn trees, with many more terminals per
   dispatch (see the roadmap).
+
+## On-device explanations (Apple Foundation Models)
+
+`swift run -c release PokerBench explain` runs six generated questions through the on-device
+model on this Mac (the iOS Simulator here reports Apple Intelligence as unavailable, so the app
+hides the button there). Temperature 0, the player's answer set to the worst option:
+
+```
+--- callOrFold (chose Fold, Blunder) 3.5 s: kept
+The best option is to call with an expected value of 61.22 bb, which is higher than the 0 bb from folding. You gave up 61.22 bb, 83.3% of the pot, by folding. That makes this a blunder because the call is clearly the better choice.
+--- mdf (chose 20%, Blunder) 1.6 s: kept
+The best option is 80%, which gives you the highest expected value. You defended less than the required 80%, so that’s a blunder. The solver shows that 80% is needed to avoid letting a pure bluff win.
+--- pushFold (chose Fold, Blunder) 1.7 s: kept
+The best option is shove with an expected value of 0.14 bb, which is higher than the fold's -0.5 bb. You gave up 0.64 bb, which is more than the pot size of the best play. That makes this a blunder.
+--- bluffCatch (chose Call, Mistake) 1.9 s: kept
+The best option is fold because it has an expected value of 0 bb, which is the highest possible. Calling has an expected value of -10.7 bb, meaning you lose 10.7 bb on average. Since the call is worse than folding, it’s a mistake.
+--- riverDefend (chose All-in, Blunder) 1.9 s: kept
+The best option is Fold with an expected value of 0 bb, which is the highest. Calling has an expected value of -0.75 bb and going all-in has -2.79 bb, both worse than folding. You gave up 2.79 bb by going all-in, which is a blunder.
+--- icmCall (chose Call, Correct) 1.9 s: kept
+The best option is fold because it has a higher expected value of 31.35% of prizes compared to call’s 30.46%. Fold wins more than half the prize pool based on the given numbers. Call loses just under 1% of the total prizes, so fold is the better choice.
+kept 6, withheld 0
+
+```
+
+- A first prompt (spot plus "explain why the best option is best") passed a numbers-only check
+  but got the logic wrong in 3 of 6 replies (one named the worse ICM option as best, one invented
+  a missed draw). The shipped prompt states the best option, the player's choice, the EV given up
+  and "higher EV is always better". A reply is shown only if it names the best option, never calls
+  another option best, and uses no number missing from the prompt. All 6 replies above pass.
+- Guards can't catch every slip: the push/fold reply's "more than the pot size" and the ICM
+  reply's "more than half the prize pool" are wrong. That's why the app labels the text as
+  AI-written and says the solver feedback above it is authoritative.
+- Latency on this Mac: 1.6-3.5 s per reply after the first. Not measured on an iPhone.

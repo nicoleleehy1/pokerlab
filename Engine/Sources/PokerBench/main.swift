@@ -1,5 +1,9 @@
 import PokerCore
 import PokerSolver
+import PokerCourse
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 import Darwin
 
 // PokerBench: prints throughput numbers for BENCHMARKS.md. Run with:
@@ -34,6 +38,7 @@ if mode == "toy" || mode == "all" { runToy() }
 if mode == "dcfr" || mode == "all" { await runDCFR() }
 if mode == "firstin" || mode == "all" { runFirstIn() }
 if mode == "rivergpu" { runRiverGPU() }
+if mode == "explain" { await runExplain() }
 if mode == "street" { runStreet(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 if mode == "river" || mode == "all" { runRiver(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 print("")
@@ -358,5 +363,34 @@ func runRiverGPU() {
         let diff = abs(cpu.exploitability() - gpuSolver.exploitability())
         print("\(entry.name): CPU \(fmt(cpuMs, 1)) ms | Metal \(fmt(gpuWall, 1)) ms wall (\(fmt(gpu.gpuSeconds * 1000, 1)) ms GPU) | \(gpu.terminals.count) terminals | exploitability difference \(String(format: "%.4f", diff)) pp | CPU/Metal \(fmt(cpuMs / gpuWall, 2))x")
     }
+    #endif
+}
+
+/// Asks the on-device Foundation Model to explain generated questions, and checks each reply
+/// against the solver's numbers with ExplanationPrompt.unsupportedNumbers.
+func runExplain() async {
+    #if canImport(FoundationModels)
+    guard #available(macOS 26.0, *) else { print("needs macOS 26"); return }
+    print("\nFoundation Models explanations (availability: \(SystemLanguageModel.default.availability))")
+    var kept = 0, withheld = 0
+    let templates: [TemplateID] = [.callOrFold, .mdf, .pushFold, .bluffCatch, .riverDefend, .icmCall]
+    for (k, t) in templates.enumerated() {
+        let q = try! await t.generate(seed: UInt64(100 + k))
+        let worst = q.options.indices.min { q.options[$0].ev < q.options[$1].ev }!
+        let verdict = q.grade(worst).verdict.title
+        let clock = ContinuousClock(); let t0 = clock.now
+        do {
+            let session = LanguageModelSession(instructions: ExplanationPrompt.instructions)
+            let reply = try await session.respond(to: ExplanationPrompt.prompt(q, choice: worst),
+                                                  options: GenerationOptions(temperature: 0)).content
+            let ok = ExplanationPrompt.accept(reply, for: q)
+            if ok { kept += 1 } else { withheld += 1 }
+            print("--- \(t.rawValue) (chose \(q.options[worst].label), \(verdict)) \(fmt(seconds(clock.now - t0), 1)) s: \(ok ? "kept" : "withheld")")
+            print(reply.trimmingCharacters(in: .whitespacesAndNewlines))
+        } catch {
+            print("--- \(t.rawValue): error \(error)")
+        }
+    }
+    print("kept \(kept), withheld \(withheld)")
     #endif
 }

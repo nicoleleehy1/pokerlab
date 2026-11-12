@@ -19,6 +19,7 @@
 		31C41A3E14DC0A1268E0067A /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED5E51DCF917E6E12D055F38 /* SettingsView.swift */; };
 		3A8B40BED11753689C3045D1 /* PokerCore in Frameworks */ = {isa = PBXBuildFile; productRef = 83BADCE3B31CF4C4503CFFF5 /* PokerCore */; };
 		3A94AF286D9B7F3254AB58C4 /* ToyGameLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6FD1A9C5395DB71A958D9CB /* ToyGameLabView.swift */; };
+		411A7C6D3271DCCFD98ABACB /* ExplainUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18A135A1865DC89372AFB6F5 /* ExplainUITests.swift */; };
 		476D243B3791B9CF6A0810C6 /* PokerSolver in Frameworks */ = {isa = PBXBuildFile; productRef = CF13FEE731E2203F003F02DB /* PokerSolver */; };
 		49965C0515D9BFBCE131FB43 /* DrillFlowUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB88B8AFD259E86F24EF8ED /* DrillFlowUITests.swift */; };
 		54B85E56B8C924DEE917F7F8 /* SolverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BDC21D1EE1E8653F19D826C /* SolverUITests.swift */; };
@@ -26,6 +27,7 @@
 		60A5485B7058CFDADCF4FE62 /* DrillLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C10CC3CAEE378F4E537966 /* DrillLiveActivity.swift */; };
 		689C5193CD39F8BF262DBD24 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0CD4FCEF11869AAAABBFA76B /* Assets.xcassets */; };
 		7224CDB5476541141486AE2F /* EquityLabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB263A623D176A2984ACED83 /* EquityLabModel.swift */; };
+		7F49C84890D7320FCEC7641F /* ExplainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C1EDB1731BC5D4707A87C0C /* ExplainView.swift */; };
 		82C33BFE5E6B5BB59634C5A8 /* SolverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF906A46BA1B52C73ED3AB47 /* SolverView.swift */; };
 		83692A9BFDE1B6BD7BB1FC11 /* CardScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D882C4374BD6DAE973704EF /* CardScanner.swift */; };
 		88ADCCB2F155BE32FC349DBB /* LearnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97FB70E960CA3BF56026CD28 /* LearnView.swift */; };
@@ -92,7 +94,9 @@
 		1247A76FA4FE6279522C6B8F /* WidgetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridge.swift; sourceTree = "<group>"; };
 		14FE49A9E1509F96AFE85025 /* DrillSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DrillSessionView.swift; sourceTree = "<group>"; };
 		1587A17533DC86F80C6862E7 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		18A135A1865DC89372AFB6F5 /* ExplainUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplainUITests.swift; sourceTree = "<group>"; };
 		1C0C462C8B838D00C0C7FF36 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		1C1EDB1731BC5D4707A87C0C /* ExplainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExplainView.swift; sourceTree = "<group>"; };
 		298413FFD0C66D06127DEF40 /* PokerLabUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = PokerLabUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		2DF3EE2F4E924C5E4F39A1B8 /* CardScanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScanModel.swift; sourceTree = "<group>"; };
 		2E771F1569418889BFD5C51D /* LessonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LessonView.swift; sourceTree = "<group>"; };
@@ -198,6 +202,7 @@
 			isa = PBXGroup;
 			children = (
 				7E40AF67000D72D5ADE5774F /* CourseBridge.swift */,
+				1C1EDB1731BC5D4707A87C0C /* ExplainView.swift */,
 				97FB70E960CA3BF56026CD28 /* LearnView.swift */,
 				2E771F1569418889BFD5C51D /* LessonView.swift */,
 			);
@@ -226,6 +231,7 @@
 			isa = PBXGroup;
 			children = (
 				4EB88B8AFD259E86F24EF8ED /* DrillFlowUITests.swift */,
+				18A135A1865DC89372AFB6F5 /* ExplainUITests.swift */,
 				DE418BDAF2E166372D5E0751 /* LearnFlowUITests.swift */,
 				5BDC21D1EE1E8653F19D826C /* SolverUITests.swift */,
 			);
@@ -527,6 +533,7 @@
 				897AF0D9B0DCF26FE44FCEF7 /* EquityBars.swift in Sources */,
 				7224CDB5476541141486AE2F /* EquityLabModel.swift in Sources */,
 				CC4638B7BAEEA2B9F1AF10AF /* EquityLabView.swift in Sources */,
+				7F49C84890D7320FCEC7641F /* ExplainView.swift in Sources */,
 				88ADCCB2F155BE32FC349DBB /* LearnView.swift in Sources */,
 				E5E9A0A28A671A953FFB279B /* LessonView.swift in Sources */,
 				1D9C80A82A77CBB8855E6215 /* LiveActivityController.swift in Sources */,
@@ -552,6 +559,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				49965C0515D9BFBCE131FB43 /* DrillFlowUITests.swift in Sources */,
+				411A7C6D3271DCCFD98ABACB /* ExplainUITests.swift in Sources */,
 				8C0C3AA0F45FDAF3C466B267 /* LearnFlowUITests.swift in Sources */,
 				54B85E56B8C924DEE917F7F8 /* SolverUITests.swift in Sources */,
 			);
