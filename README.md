@@ -5,6 +5,16 @@ push/fold solver with a Metal path, spaced-repetition drills, and camera card re
 Calm, first-party Apple look (no casino felt), with full VoiceOver labels, Dynamic Type,
 Reduce Motion and an optional four-colour deck.
 
+## Screenshots
+
+![PokerLab: the Learn path and the on-device river solver](docs/images/showcase-1-cover.png)
+
+![River solver: both full ranges solved on the phone in 68 ms](docs/images/showcase-2-river-solver.png)
+
+![Push/fold Nash ranges on the GPU with Metal](docs/images/showcase-3-push-fold-metal.png)
+
+![Adaptive review and the exact-equity lab](docs/images/showcase-4-practice.png)
+
 ## What's in the box
 
 | Area | What it does |
