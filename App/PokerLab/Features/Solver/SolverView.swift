@@ -33,7 +33,7 @@ struct SolverView: View {
                 } else {
                     ProgressView("Solving").padding(40)
                 }
-                Text("Heads-up, blinds 0.5/1 bb, no ante. Equities are exact (every board enumerated) for every pair of hand classes; CFR+ runs on this device.")
+                Text("Heads-up, blinds 0.5/1 bb, no ante. Equities are exact (every board enumerated) for every pair of hand classes; the solver runs on this device.")
                     .font(.footnote).foregroundStyle(.secondary).padding(.horizontal)
             }
             .padding()
