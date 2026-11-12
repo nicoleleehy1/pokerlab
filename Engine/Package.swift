@@ -29,7 +29,7 @@ let package = Package(
         .testTarget(name: "PokerSolverTests", dependencies: ["PokerSolver"]),
         .testTarget(name: "PokerTrainingTests", dependencies: ["PokerTraining"]),
         .testTarget(name: "CardRecognitionCoreTests", dependencies: ["CardRecognitionCore"]),
-        .testTarget(name: "PokerCourseTests", dependencies: ["PokerCourse"]),
+        .testTarget(name: "PokerCourseTests", dependencies: ["PokerCourse", "PokerSolver"]),
     ],
     swiftLanguageModes: [.v6]
 )

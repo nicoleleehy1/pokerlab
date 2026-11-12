@@ -245,3 +245,30 @@ Metal DCFR(1.5, 0.0, 2.0)  | < 1.0: mean 20 (40/40) | < 0.1: mean 44 (40/40) | <
 The GPU needs exactly the same iterations as the CPU for each target (the kernels compute the
 same updates in Float), so DCFR's 4.5× reduction at 0.01 mbb/hand carries over to Metal. Tests
 check that each kernel's DCFR strategies match the CPU DCFR solver to within 0.01.
+
+## 6-max first-in shove charts (Unit 3)
+
+`swift run -c release PokerBench firstin`. Folded to the hero, who shoves or folds; the players
+behind call or fold in order (at most one caller). Exact heads-up class equities, DCFR, 1,500
+iterations. NashConv is the total gain available to players who each switch to a best response:
+
+```
+6-max first-in shove/fold (DCFR, 1,500 iterations, at most one caller)
+10 bb UTG: shove 15.4% | call: HJ 8.1%, CO 8.2%, BTN 8.0%, SB 8.5%, BB 10.0% | NashConv 0.00000 bb | 588 ms
+10 bb HJ : shove 19.4% | call: CO 10.0%, BTN 10.0%, SB 11.9%, BB 13.1% | NashConv 0.00000 bb | 442 ms
+10 bb CO : shove 24.9% | call: BTN 13.1%, SB 15.0%, BB 16.9% | NashConv 0.00000 bb | 296 ms
+10 bb BTN: shove 32.6% | call: SB 19.6%, BB 23.7% | NashConv 0.00000 bb | 179 ms
+10 bb SB : shove 58.3% | call: BB 37.4% | NashConv 0.00000 bb | 84 ms
+15 bb UTG: shove 10.6% | call: HJ 5.6%, CO 5.4%, BTN 5.1%, SB 5.6%, BB 5.7% | NashConv 0.00000 bb | 585 ms
+15 bb HJ : shove 13.8% | call: CO 6.3%, BTN 6.3%, SB 7.6%, BB 7.8% | NashConv 0.00000 bb | 434 ms
+15 bb CO : shove 18.6% | call: BTN 8.4%, SB 10.0%, BB 10.9% | NashConv 0.00000 bb | 298 ms
+15 bb BTN: shove 26.6% | call: SB 14.0%, BB 15.7% | NashConv 0.00000 bb | 178 ms
+15 bb SB : shove 45.7% | call: BB 28.5% | NashConv 0.00000 bb | 82 ms
+```
+
+- The SB row is exactly heads-up push/fold, and matches `CFRPlusSolver` (58.3% / 37.4% at 10 bb).
+  That's the validation test for the multi-seat solver.
+- NashConv prints as 0.00000 bb because it is below 1e-5 bb/hand after 1,500 iterations.
+- Unit 3's "First in: shove or fold" lesson grades against these charts (800 iterations, cached
+  per seat and stack). The 100 bb opening widths in "Position and range width" are still sourced
+  figures (Upswing); a full 100 bb six-handed preflop solve is out of scope on device.

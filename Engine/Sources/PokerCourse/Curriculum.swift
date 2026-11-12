@@ -70,9 +70,10 @@ public enum Curriculum {
             Lesson("u2-l2", "Hand vs range", [.equityVsRange]),
             Lesson("u2-l3", "Mixed review", [.equityVsHand, .equityVsRange]),
         ], isAvailable: true),
-        CourseUnit(number: 3, title: "Preflop foundations", summary: "Open wider in later position; raise, don't limp.", lessons: [
+        CourseUnit(number: 3, title: "Preflop foundations", summary: "Later seats play wider: solved first-in charts by seat.", lessons: [
             Lesson("u3-l1", "Position and range width", [.openingWidth]),
-            Lesson("u3-l2", "Open or fold", [.openOrFold]),
+            Lesson("u3-l2", "First in: shove or fold", [.firstInShove]),
+            Lesson("u3-l3", "Mixed review", [.openingWidth, .firstInShove]),
         ], isAvailable: true),
         CourseUnit(number: 4, title: "What GTO is", summary: "Unexploitable is not the same as maximum profit.", lessons: [
             Lesson("u4-l1", "Kuhn poker", [.kuhn]),

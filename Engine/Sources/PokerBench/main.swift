@@ -32,6 +32,7 @@ if mode == "core" || mode == "all" { try await runCore() }
 if mode == "solver" || mode == "all" { try await runSolver() }
 if mode == "toy" || mode == "all" { runToy() }
 if mode == "dcfr" || mode == "all" { await runDCFR() }
+if mode == "firstin" || mode == "all" { runFirstIn() }
 if mode == "river" || mode == "all" { runRiver(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 print("")
 print("checksum \(checksum)")
@@ -296,5 +297,19 @@ func runRiver(only: Int?) {
         let h = solver.handCounts, k = solver.canonicalHandCounts
         print("\(entry.name): hands \(h.oop)/\(h.ip) (canonical \(k.oop)/\(k.ip)), \(solver.decisionNodeCount) decision nodes, tables \(fmt(Double(solver.storageBytes) / 1_048_576, 2)) MB")
         print("   \(r.iterations) iterations, exploitability \(fmt(r.exploitability, 3))% pot, solve \(fmt(r.solveSeconds * 1000, 1)) ms, setup \(fmt(setup * 1000, 1)) ms, wall incl. checks \(fmt(wall * 1000, 1)) ms, process peak footprint \(fmt(peakFootprintMB(), 1)) MB")
+    }
+}
+
+/// 6-max first-in shove charts: range size per seat, NashConv and solve time.
+func runFirstIn() {
+    print("\n6-max first-in shove/fold (DCFR, 1,500 iterations, at most one caller)")
+    for stack in [10.0, 15.0] {
+        for seat in [FirstInShoveSolver.Seat.utg, .hj, .co, .btn, .sb] {
+            let clock = ContinuousClock(); let t0 = clock.now
+            let s = FirstInShoveSolver.shared.solve(seat: seat, stack: stack)
+            let ms = seconds(clock.now - t0) * 1000
+            let callers = s.callers.map { "\($0.seat.name) \(fmt($0.call.enumerated().reduce(0) { $0 + $1.element * Double(HandClass(index: $1.offset).comboCount) } / 13.26, 1))%" }.joined(separator: ", ")
+            print("\(Int(stack)) bb \(seat.name.padding(toLength: 3, withPad: " ", startingAt: 0)): shove \(fmt(s.pushFraction * 100, 1))% | call: \(callers) | NashConv \(String(format: "%.5f", s.nashConv)) bb | \(fmt(ms, 0)) ms")
+        }
     }
 }

@@ -7,7 +7,7 @@ import PokerSolver
 public enum TemplateID: String, CaseIterable, Hashable, Sendable, Codable {
     case requiredEquity, callOrFold
     case equityVsHand, equityVsRange
-    case openingWidth, openOrFold
+    case openingWidth, openOrFold, firstInShove
     case kuhn
     case mdf, bluffRatio, bluffCatch
     case pushFold, callShove
@@ -21,7 +21,7 @@ public enum TemplateID: String, CaseIterable, Hashable, Sendable, Codable {
         case .callOrFold: .callOrFold
         case .equityVsHand: .equityVsHand
         case .equityVsRange: .equityVsRange
-        case .openingWidth, .openOrFold: .openingRanges
+        case .openingWidth, .openOrFold, .firstInShove: .openingRanges
         case .kuhn, .caveats: .gtoBasics
         case .mdf: .mdf
         case .bluffRatio: .bluffRatio
@@ -48,6 +48,7 @@ public enum TemplateID: String, CaseIterable, Hashable, Sendable, Codable {
         case .equityVsRange: return try await g.equityVsRange()
         case .openingWidth: return g.openingWidth()
         case .openOrFold: return g.openOrFold()
+        case .firstInShove: return await g.firstInShove()
         case .kuhn: return g.kuhn()
         case .mdf: return g.mdf()
         case .bluffRatio: return g.bluffRatio()
@@ -267,6 +268,23 @@ struct Gen {
         return q
     }
 
+    /// First in at 8-15 bb in 6-max: shove or fold, graded by EV against the solved chart.
+    mutating func firstInShove() async -> Question {
+        let seat = pick([FirstInShoveSolver.Seat.utg, .hj, .co, .btn, .sb])
+        let stack = Double(pick([8, 10, 12, 15]))
+        let sol = await FirstInCache.shared.solution(seat: seat, stack: stack)
+        let h = hand()
+        let hc = h.handClass
+        let shove = sol.shoveEV[hc.index], fold = sol.foldEV
+        let callers = sol.callers.map(\.seat.name).joined(separator: ", ")
+        return Question(id: id, concept: .openingRanges, kind: .decision,
+                        prompt: "Six-max, \(Int(stack)) bb deep, folded to you in the \(seat.name). Shove or fold?",
+                        hero: [h.high, h.low],
+                        facts: [.init("Stack", "\(Int(stack)) bb"), .init("Still to act", callers)],
+                        options: [.init("Fold", ev: fold), .init("Shove", ev: shove)], pot: 1.5,
+                        explanation: "Against the solved calling ranges, shoving \(hc) is worth \(Fmt.signed(shove)) and folding \(Fmt.signed(fold)). The solved \(seat.name) chart shoves \(Fmt.pct(sol.pushFraction, 0)) of hands, including \(hc) \(Fmt.pct(sol.push[hc.index], 0)) of the time. Fewer players behind means fewer hands that can call, so later seats shove wider. (Discounted CFR on this device; assumes at most one caller.)")
+    }
+
     // MARK: Unit 4: Kuhn poker (closed form)
 
     mutating func kuhn() -> Question {
@@ -431,6 +449,20 @@ func equityOf(_ request: EquityRequest, seed: UInt64) async throws -> Double {
         return try await EquityCalculator.exact(request).equities[0]
     }
     return try await EquityCalculator.monteCarlo(request, trials: 200_000, seed: seed).equities[0]
+}
+
+/// First-in charts are reused across questions (one solve per seat and stack).
+actor FirstInCache {
+    static let shared = FirstInCache()
+    private var cache: [String: FirstInShoveSolver.Solution] = [:]
+
+    func solution(seat: FirstInShoveSolver.Seat, stack: Double) -> FirstInShoveSolver.Solution {
+        let key = "\(seat.rawValue)-\(stack)"
+        if let s = cache[key] { return s }
+        let s = FirstInShoveSolver.shared.solve(seat: seat, stack: stack, iterations: 800)
+        cache[key] = s
+        return s
+    }
 }
 
 /// Push/fold solutions are reused across questions (one CFR+ solve per stack depth).

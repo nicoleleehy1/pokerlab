@@ -1,6 +1,7 @@
 import Testing
 import PokerCore
 @testable import PokerCourse
+import PokerSolver
 
 @Suite("EV-loss grading")
 struct GradingTests {
@@ -115,6 +116,24 @@ struct GeneratorTests {
             let freq = sol.push[hc.index]
             guard freq < 0.05 || freq > 0.95 else { continue }
             #expect(q.correctOptions.contains(freq > 0.5 ? 1 : 0), "\(hc) at \(stack) bb: Nash \(freq)")
+            checked += 1
+        }
+        #expect(checked > 20)
+    }
+
+    /// Unit 3 grades against the solved first-in chart: hands the chart always shoves have a
+    /// +EV shove, hands it never shoves have folding as the best answer.
+    @Test func firstInShoveMatchesSolvedChart() async throws {
+        var checked = 0
+        for seed in UInt64(1)...30 {
+            let q = try await TemplateID.firstInShove.generate(seed: seed)
+            let seatName = q.prompt.components(separatedBy: "in the ").last!.components(separatedBy: ".").first!
+            let seat = FirstInShoveSolver.Seat.allCases.first { $0.name == seatName }!
+            let stack = Double(q.facts[0].value.split(separator: " ")[0])!
+            let sol = await FirstInCache.shared.solution(seat: seat, stack: stack)
+            let f = sol.push[HoleCards(q.hero[0], q.hero[1]).handClass.index]
+            guard f < 0.05 || f > 0.95 else { continue }
+            #expect(q.correctOptions.contains(f > 0.5 ? 1 : 0))
             checked += 1
         }
         #expect(checked > 20)
