@@ -92,6 +92,10 @@ final class ReviewFlowUITests: XCTestCase {
         app.tabBars.buttons["Profile"].tap()
         XCTAssertTrue(app.staticTexts["Concept mastery"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Answer a few course questions to see your mastery per concept."].exists)
+        // Ten logged answers: the model check asks for 20 more before it evaluates.
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Model check"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Answer 20 more course questions to measure how well PokerLab predicts you."].exists)
         if let dir = ProcessInfo.processInfo.environment["SCREENSHOT_DIR"] {
             try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: dir).appendingPathComponent("profile-mastery.png"))
         }

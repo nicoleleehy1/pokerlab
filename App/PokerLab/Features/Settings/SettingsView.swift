@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PokerCourse
 import CloudKit
 import CoreTransferable
 import UniformTypeIdentifiers
@@ -8,6 +9,7 @@ struct SettingsView: View {
     @AppStorage("fourColorDeck") private var fourColorDeck = false
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
     @Query(sort: \DrillAttempt.date) private var attempts: [DrillAttempt]
+    @Query(sort: \AnswerLogEntry.day) private var answerLog: [AnswerLogEntry]
     @State private var syncStatus = "Checking…"
 
     var body: some View {
@@ -33,6 +35,9 @@ struct SettingsView: View {
                     Label("Export history (CSV)", systemImage: "square.and.arrow.up")
                 }
                 LabeledContent("Spots answered", value: "\(attempts.count)")
+                ShareLink(item: AnswerLogExport(events: answerLog.compactMap(\.event)), preview: SharePreview("PokerLab answer log.csv")) {
+                    Label("Export course answer log (CSV)", systemImage: "square.and.arrow.up")
+                }
             }
             Section("About") {
                 LabeledContent("Engine", value: "PokerCore (Swift 6)")
