@@ -57,11 +57,9 @@ struct SolverView: View {
             Picker("Backend", selection: $backend) { ForEach(Backend.allCases) { Text($0.rawValue).tag($0) } }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("solver-backend")
-            if backend == .cpu {
-                Picker("Algorithm", selection: $algorithm) { ForEach(Algorithm.allCases) { Text($0.rawValue).tag($0) } }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("solver-algorithm")
-            }
+            Picker("Algorithm", selection: $algorithm) { ForEach(Algorithm.allCases) { Text($0.rawValue).tag($0) } }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("solver-algorithm")
             if let ranOn {
                 Text(ranOn).font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("solver-ran-on")
@@ -143,10 +141,10 @@ struct SolverView: View {
                 // Fall back to the CPU solver if Metal is missing or rejects the dispatch
                 // (the iOS Simulator's GPU limits are lower than real hardware).
                 if let gpu = try? MetalCFRSolver(),
-                   let solved = try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10).first {
-                    return (solved, "Solved on the GPU (\(gpu.deviceName)) with CFR+")
+                   let solved = try? gpu.solve(stacks: [stack], iterations: 1000, checkpointEvery: 10, algorithm: algorithm).first {
+                    return (solved, "Solved on the GPU (\(gpu.deviceName)) with \(algorithm == .cfrPlus ? "CFR+" : "Discounted CFR")")
                 }
-                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10),
+                return (CFRPlusSolver().solve(stack: stack, iterations: 1000, checkpointEvery: 10, algorithm: algorithm),
                         "Metal was unavailable, so this ran on the CPU")
             }
         }.value

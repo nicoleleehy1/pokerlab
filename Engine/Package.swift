@@ -22,14 +22,14 @@ let package = Package(
         .target(name: "PokerCourse", dependencies: ["PokerCore", "PokerSolver"]),
         // Pure logic of the camera pipeline: label mapping, frame debouncing, table layout.
         .target(name: "CardRecognitionCore", dependencies: ["PokerCore"]),
-        .executableTarget(name: "PokerBench", dependencies: ["PokerCore", "PokerSolver"]),
+        .executableTarget(name: "PokerBench", dependencies: ["PokerCore", "PokerSolver", "PokerCourse"]),
         // Offline generators for the shipped tables (hash offsets, preflop equity matrix).
         .executableTarget(name: "PokerTables", dependencies: ["PokerCore"]),
         .testTarget(name: "PokerCoreTests", dependencies: ["PokerCore"]),
         .testTarget(name: "PokerSolverTests", dependencies: ["PokerSolver"]),
         .testTarget(name: "PokerTrainingTests", dependencies: ["PokerTraining"]),
         .testTarget(name: "CardRecognitionCoreTests", dependencies: ["CardRecognitionCore"]),
-        .testTarget(name: "PokerCourseTests", dependencies: ["PokerCourse"]),
+        .testTarget(name: "PokerCourseTests", dependencies: ["PokerCourse", "PokerSolver"]),
     ],
     swiftLanguageModes: [.v6]
 )
