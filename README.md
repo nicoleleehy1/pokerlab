@@ -22,11 +22,26 @@ monochrome first-party look, with VoiceOver labels, Dynamic Type and Reduce Moti
 
 | Tab | What it does |
 |---|---|
-| **Learn** | A 10-unit course (23 lessons, 19 question generators): EV and pot odds, equity vs ranges, preflop, what GTO is, toy games and indifference, push or fold, postflop structure, advanced balance, exploits, ICM. Questions are generated fresh each time and graded Best / Correct / Inaccuracy / Mistake / Blunder by the EV you gave up, with the maths shown. Daily goal, streak and XP. |
+| **Learn** | A 10-unit course (23 lessons, 19 question generators): EV and pot odds, equity vs ranges, preflop, what GTO is, toy games and indifference, push or fold, postflop structure, advanced balance, exploits, ICM. Questions are generated fresh each time and graded by the EV you gave up as a share of the pot: within 1% of the best option counts as correct (equal EV), then inaccuracy (≤ 5%), mistake (≤ 15%) and blunder, with the maths shown. Daily goal, streak and XP. |
 | **Lab** | **Equity Lab**: hand vs hand or range (`AKs, QQ+, A5s-A2s`), board, exact or Monte Carlo equity streamed live. **River solver**: both players' full ranges on one river, solved with Discounted CFR to 0.3% of the pot, then each range's strategy. **Push/fold solver**: heads-up Nash shove and call ranges by stack depth, CFR+ or DCFR, on the CPU (SIMD) or the GPU (Metal), with a convergence chart. **Toy games**: CFR, CFR+ and DCFR on Kuhn poker and the clairvoyance game, plotted live against the known answer (−1/18). **Scan a Table**: camera card reading (needs a trained model, see below). |
 | **Practice** | **Adaptive review**: ten spots per session, due items first (FSRS-4.5 scheduling), then new questions pitched at about 75% success by a per-concept Elo model. **Daily spot**: the same spot for everyone that day. Drills: Equity Quiz, Pot Odds, Range Trainer (paint a 13×13 grid against Nash). |
 | **Profile** | Streak, spots answered and accuracy, accuracy over the last 30 days (Swift Charts), leaks by category (weakest first) and recent sessions. |
-| **Extras** | Daily drill widget (small, medium, Lock Screen), Live Activity for drill sessions, App Intents / Siri Shortcuts, deep links (`pokerlab://learn`, `pokerlab://daily`, `pokerlab://solver`, `pokerlab://camera`, …) |
+| **Extras** | Daily drill widget (small, medium, Lock Screen), Live Activity for drill sessions, App Intents / Siri Shortcuts, deep links (`pokerlab://learn`, `pokerlab://daily`, `pokerlab://solver`, `pokerlab://river`, `pokerlab://toys`, `pokerlab://camera`) |
+
+### The course
+
+| # | Unit | Questions generated from |
+|---|---|---|
+| 1 | EV and pot odds | Required equity s/(2s+1); call-or-fold EV against a range |
+| 2 | Equity vs ranges | Exact (or Monte Carlo) equity |
+| 3 | Preflop foundations | 6-max opening widths; open or fold on clear-cut hands |
+| 4 | What GTO is | Kuhn poker equilibrium (value −1/18) |
+| 5 | Toy games and indifference | MDF 1/(1+s), alpha s/(1+s), bluff share s/(2s+1), bluff-catching EV |
+| 6 | Push or fold | Nash solve per stack depth; per-hand shove and call EVs |
+| 7 | Postflop structure | Range-vs-range river equity; bet or check EVs from the river solver |
+| 8 | Advanced balance | Facing a river bet: solver EVs and frequencies |
+| 9 | Exploits | River solves with the villain's strategy locked (a nit, a calling station) |
+| 10 | ICM and caveats | Malmuth-Harville ICM call decisions; GTO's limits |
 
 ## Architecture
 
@@ -37,7 +52,8 @@ pokerlab/
 │   │                             evaluator, exact and Monte Carlo equity, AsyncStream snapshots,
 │   │                             range parser with card removal. No UI, no Foundation.
 │   ├── PokerSolver               CFR+ and DCFR push/fold (scalar, SIMD16, Metal), full-range
-│   │                             river solver (DCFR, SIMD8, suit isomorphism), toy games,
+│   │                             river solver (DCFR, SIMD8, suit isomorphism, node locking),
+│   │                             toy games (Kuhn, clairvoyance),
 │   │                             exploitability, shipped 169×169 preflop equity table
 │   ├── PokerCourse               curriculum, question templates, EV grading, FSRS-4.5 +
 │   │                             per-concept Elo, ICM
