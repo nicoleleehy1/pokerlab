@@ -1,5 +1,8 @@
 import Testing
 @testable import PokerSolver
+#if canImport(Metal)
+import Metal
+#endif
 
 @Suite("Discounted CFR push/fold")
 struct DCFRPushFoldTests {
@@ -38,3 +41,35 @@ struct DCFRPushFoldTests {
         #expect(CFRPlusSolver.Algorithm.cfrPlus.discounts(5) == nil)
     }
 }
+
+#if canImport(Metal)
+@Suite("Discounted CFR on Metal")
+struct MetalDCFRTests {
+    /// Both GPU kernels run DCFR and agree with the CPU DCFR solver.
+    @Test("Metal DCFR matches CPU DCFR", arguments: MetalCFRSolver.Kernel.allCases)
+    func metalMatchesCPU(_ kernel: MetalCFRSolver.Kernel) throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { return }   // no GPU here
+        let gpu = try MetalCFRSolver()
+        let stacks: [Double] = [5, 10, 20]
+        let g = try gpu.solve(stacks: stacks, iterations: 600, checkpointEvery: 600, kernel: kernel, algorithm: .dcfr)
+        for (i, s) in stacks.enumerated() {
+            let c = CFRPlusSolver().solve(stack: s, iterations: 600, checkpointEvery: 600, algorithm: .dcfr)
+            var maxDiff = 0.0
+            for k in 0..<169 { maxDiff = max(maxDiff, abs(g[i].push[k] - c.push[k]), abs(g[i].call[k] - c.call[k])) }
+            #expect(maxDiff < 0.01, "\(kernel) stack \(s): \(maxDiff)")
+            #expect(g[i].exploitability < 0.5)
+        }
+    }
+
+    /// DCFR on the GPU reaches 0.1 mbb/hand in fewer iterations than CFR+ on the GPU.
+    @Test func metalDCFRConvergesFaster() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { return }   // no GPU here
+        let gpu = try MetalCFRSolver()
+        func iterationsTo(_ target: Double, _ algorithm: CFRPlusSolver.Algorithm) throws -> Int {
+            let sol = try gpu.solve(stacks: [10], iterations: 1000, checkpointEvery: 10, algorithm: algorithm)[0]
+            return sol.curve.first { $0.exploitability < target }?.iteration ?? .max
+        }
+        #expect(try iterationsTo(0.1, .dcfr) < iterationsTo(0.1, .cfrPlus))
+    }
+}
+#endif

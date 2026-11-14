@@ -231,3 +231,126 @@ Simulated learner, held-out half: Elo log loss 0.5623075698742775, constant base
 This only shows the model learns what the simulation builds in. The research doc's real
 metric (next-answer AUC and log loss on a past-to-future split of real review logs) needs
 real usage data and has not been measured.
+
+### Discounted CFR on Metal
+
+Both Metal kernels now take the algorithm as a parameter (CFR+ or DCFR(1.5, 0, 2)).
+`swift run -c release PokerBench dcfr`, same 40 stack depths, exploitability checked every 10 iterations:
+
+```
+Metal CFR+                 | < 1.0: mean 44 (40/40) | < 0.1: mean 138 (40/40) | < 0.01: mean 446 (40/40) | GPU 105.6 ms for 2,000 iterations x 40 depths
+Metal DCFR(1.5, 0.0, 2.0)  | < 1.0: mean 20 (40/40) | < 0.1: mean 44 (40/40) | < 0.01: mean 99 (40/40) | GPU 92.0 ms for 2,000 iterations x 40 depths
+```
+
+The GPU needs exactly the same iterations as the CPU for each target (the kernels compute the
+same updates in Float), so DCFR's 4.5× reduction at 0.01 mbb/hand carries over to Metal. Tests
+check that each kernel's DCFR strategies match the CPU DCFR solver to within 0.01.
+
+## 6-max first-in shove charts (Unit 3)
+
+`swift run -c release PokerBench firstin`. Folded to the hero, who shoves or folds; the players
+behind call or fold in order (at most one caller). Exact heads-up class equities, DCFR, 1,500
+iterations. NashConv is the total gain available to players who each switch to a best response:
+
+```
+6-max first-in shove/fold (DCFR, 1,500 iterations, at most one caller)
+10 bb UTG: shove 15.4% | call: HJ 8.1%, CO 8.2%, BTN 8.0%, SB 8.5%, BB 10.0% | NashConv 0.00000 bb | 588 ms
+10 bb HJ : shove 19.4% | call: CO 10.0%, BTN 10.0%, SB 11.9%, BB 13.1% | NashConv 0.00000 bb | 442 ms
+10 bb CO : shove 24.9% | call: BTN 13.1%, SB 15.0%, BB 16.9% | NashConv 0.00000 bb | 296 ms
+10 bb BTN: shove 32.6% | call: SB 19.6%, BB 23.7% | NashConv 0.00000 bb | 179 ms
+10 bb SB : shove 58.3% | call: BB 37.4% | NashConv 0.00000 bb | 84 ms
+15 bb UTG: shove 10.6% | call: HJ 5.6%, CO 5.4%, BTN 5.1%, SB 5.6%, BB 5.7% | NashConv 0.00000 bb | 585 ms
+15 bb HJ : shove 13.8% | call: CO 6.3%, BTN 6.3%, SB 7.6%, BB 7.8% | NashConv 0.00000 bb | 434 ms
+15 bb CO : shove 18.6% | call: BTN 8.4%, SB 10.0%, BB 10.9% | NashConv 0.00000 bb | 298 ms
+15 bb BTN: shove 26.6% | call: SB 14.0%, BB 15.7% | NashConv 0.00000 bb | 178 ms
+15 bb SB : shove 45.7% | call: BB 28.5% | NashConv 0.00000 bb | 82 ms
+```
+
+- The SB row is exactly heads-up push/fold, and matches `CFRPlusSolver` (58.3% / 37.4% at 10 bb).
+  That's the validation test for the multi-seat solver.
+- NashConv prints as 0.00000 bb because it is below 1e-5 bb/hand after 1,500 iterations.
+- Unit 3's "First in: shove or fold" lesson grades against these charts (800 iterations, cached
+  per seat and stack). The 100 bb opening widths in "Position and range width" are still sourced
+  figures (Upswing); a full 100 bb six-handed preflop solve is out of scope on device.
+
+## Turn and flop solver (multi-street)
+
+`swift run -c release PokerBench street <n>`, one process per spot. DCFR(1.5, 0, 2), one thread,
+exploitability (exact best response through every runout) checked every 10 iterations and not
+timed. Pot 10; BB defend vs BTN open ranges as in the river section:
+
+```
+Turn, BB vs BTN, 1 size, no raises: hands 543/339, 580 decision nodes, 3 chance nodes, tables 3.9 MB
+   50 iterations, exploitability 0.330% pot, solve 0.73 s, setup 40 ms, peak footprint 11 MB
+Turn, BB vs BTN, 2 sizes + all-in, 1 raise: hands 543/339, 2892 decision nodes, 11 chance nodes, tables 25.9 MB
+   130 iterations, exploitability 0.437% pot, solve 24.85 s, setup 895 ms, peak footprint 35 MB
+Turn, any two cards, 1 size, no raises: hands 1128/1128, 580 decision nodes, 3 chance nodes, tables 10.0 MB
+   40 iterations, exploitability 0.360% pot, solve 3.64 s, setup 44 ms, peak footprint 18 MB
+Flop, narrow ranges, 1 size: hands 32/37, 47632 decision nodes, 444 chance nodes, tables 25.1 MB
+   40 iterations, exploitability 0.493% pot, solve 11.15 s, setup 80 ms, peak footprint 60 MB
+```
+
+- Chance nodes deal every remaining card with equal weight; hands containing the dealt card get
+  zero reach below it, so card removal is exact. Tests check that the solver matches
+  `RiverSolver` on a river board and that its no-betting value equals exact turn equity.
+- A turn with full ranges and one bet size solves in seconds. Richer trees grow fast: two sizes
+  plus all-in and one raise is 5× the nodes and took 24.9 s, because this solver uses plain
+  scalar loops and no suit isomorphism yet (unlike the SIMD river solver).
+- Flops are the limit. Even narrow ranges with one bet size give 47,632 decision nodes. With
+  full ranges and one size, the tables would need over a gigabyte, beyond iOS memory limits.
+  That's why the roadmap has a precomputed flop library rather than live full-range flop solves.
+
+## River solver on Metal vs CPU
+
+`swift run -c release PokerBench rivergpu`: 200 DCFR iterations on each backend, no checks timed.
+The Metal backend runs a CPU forward pass (reach vectors), one GPU dispatch that evaluates every
+terminal at once (one thread per terminal and hand, O(n²) with card-removal checks), and a CPU
+backward pass with the same DCFR updates:
+
+```
+Full ranges, Ks9h5c4d2s, 2 sizes: CPU 456.2 ms | Metal 1147.4 ms wall (331.1 ms GPU) | 45 terminals | exploitability difference 0.0029 pp | CPU/Metal 0.40x
+Full ranges, Ks9h5c4d2s, 3 sizes: CPU 343.4 ms | Metal 751.1 ms wall (297.8 ms GPU) | 61 terminals | exploitability difference 0.0012 pp | CPU/Metal 0.46x
+BB vs BTN ranges, Ks9h5c4d2s, 2 sizes: CPU 87.8 ms | Metal 231.8 ms wall (60.6 ms GPU) | 45 terminals | exploitability difference 0.0051 pp | CPU/Metal 0.38x
+```
+
+- **The GPU loses on rivers: the Metal backend runs at 0.38-0.46× the CPU's speed.** GPU compute
+  alone (60-331 ms) is in the CPU's range, but per terminal it does O(n²) work against the CPU's
+  O(n) sort-and-sweep, and every iteration pays two dispatch round-trips plus the CPU passes.
+- Both backends compute the same iterations: exploitability after 200 iterations differs by at
+  most 0.005 percentage points. Tests check GPU vs CPU agreement and the clairvoyance closed form
+  on the GPU.
+- The CPU stays the default. The GPU's best chance is turn trees, with many more terminals per
+  dispatch (see the roadmap).
+
+## On-device explanations (Apple Foundation Models)
+
+`swift run -c release PokerBench explain` runs six generated questions through the on-device
+model on this Mac (the iOS Simulator here reports Apple Intelligence as unavailable, so the app
+hides the button there). Temperature 0, the player's answer set to the worst option:
+
+```
+--- callOrFold (chose Fold, Blunder) 3.5 s: kept
+The best option is to call with an expected value of 61.22 bb, which is higher than the 0 bb from folding. You gave up 61.22 bb, 83.3% of the pot, by folding. That makes this a blunder because the call is clearly the better choice.
+--- mdf (chose 20%, Blunder) 1.6 s: kept
+The best option is 80%, which gives you the highest expected value. You defended less than the required 80%, so that’s a blunder. The solver shows that 80% is needed to avoid letting a pure bluff win.
+--- pushFold (chose Fold, Blunder) 1.7 s: kept
+The best option is shove with an expected value of 0.14 bb, which is higher than the fold's -0.5 bb. You gave up 0.64 bb, which is more than the pot size of the best play. That makes this a blunder.
+--- bluffCatch (chose Call, Mistake) 1.9 s: kept
+The best option is fold because it has an expected value of 0 bb, which is the highest possible. Calling has an expected value of -10.7 bb, meaning you lose 10.7 bb on average. Since the call is worse than folding, it’s a mistake.
+--- riverDefend (chose All-in, Blunder) 1.9 s: kept
+The best option is Fold with an expected value of 0 bb, which is the highest. Calling has an expected value of -0.75 bb and going all-in has -2.79 bb, both worse than folding. You gave up 2.79 bb by going all-in, which is a blunder.
+--- icmCall (chose Call, Correct) 1.9 s: kept
+The best option is fold because it has a higher expected value of 31.35% of prizes compared to call’s 30.46%. Fold wins more than half the prize pool based on the given numbers. Call loses just under 1% of the total prizes, so fold is the better choice.
+kept 6, withheld 0
+
+```
+
+- A first prompt (spot plus "explain why the best option is best") passed a numbers-only check
+  but got the logic wrong in 3 of 6 replies (one named the worse ICM option as best, one invented
+  a missed draw). The shipped prompt states the best option, the player's choice, the EV given up
+  and "higher EV is always better". A reply is shown only if it names the best option, never calls
+  another option best, and uses no number missing from the prompt. All 6 replies above pass.
+- Guards can't catch every slip: the push/fold reply's "more than the pot size" and the ICM
+  reply's "more than half the prize pool" are wrong. That's why the app labels the text as
+  AI-written and says the solver feedback above it is authoritative.
+- Latency on this Mac: 1.6-3.5 s per reply after the first. Not measured on an iPhone.

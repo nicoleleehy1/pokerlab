@@ -1,4 +1,5 @@
 #if canImport(Metal)
+import Foundation
 import Metal
 import PokerCore
 
@@ -68,10 +69,32 @@ public final class MetalCFRSolver: @unchecked Sendable {
 
     public var deviceName: String { device.name }
 
+    /// Matches `struct Params` in the shader.
+    struct GPUParams {
+        var iterations: UInt32, startIteration: UInt32, mode: UInt32
+        var alpha: Float, beta: Float, gamma: Float
+        init(chunk: Int, start: Int, algorithm: CFRPlusSolver.Algorithm) {
+            iterations = UInt32(chunk); startIteration = UInt32(start)
+            switch algorithm {
+            case .cfrPlus: mode = 0; alpha = 0; beta = 0; gamma = 0
+            case .dcfr(let a, let b, let g): mode = 1; alpha = Float(a); beta = Float(b); gamma = Float(g)
+            }
+        }
+    }
+
+    /// Total weight of the strategy sums after `iterations` (what the averages divide by).
+    /// CFR+ weights iteration t by t; DCFR adds 1 and discounts by (t/(t+1))^gamma each step.
+    static func strategyWeight(iterations n: Int, algorithm: CFRPlusSolver.Algorithm) -> Double {
+        guard case .dcfr(_, _, let g) = algorithm else { return Double(n) * Double(n + 1) / 2 }
+        var w = 0.0
+        for t in stride(from: 1.0, through: Double(n), by: 1) { w = (w + 1) * Foundation.pow(t / (t + 1), g) }
+        return w
+    }
+
     /// Solves every stack depth together. GPU time is measured with command-buffer timestamps;
     /// exploitability checkpoints are computed on the CPU between dispatches and not timed.
     public func solve(stacks: [Double], iterations: Int, checkpointEvery: Int = 50,
-                      kernel: Kernel = .simdGroupRows) throws -> [PushFoldSolution] {
+                      kernel: Kernel = .simdGroupRows, algorithm: CFRPlusSolver.Algorithm = .cfrPlus) throws -> [PushFoldSolution] {
         let s = PushFoldMatrices.stride, n = PushFoldMatrices.n
         let depthCount = stacks.count
         let floatsPerDepth = 8 * s
@@ -87,7 +110,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
         var done = 0
         while done < iterations {
             let chunk = min(checkpointEvery, iterations - done)
-            var params = (UInt32(chunk), UInt32(done))
+            var params = GPUParams(chunk: chunk, start: done, algorithm: algorithm)
             guard let cmd = queue.makeCommandBuffer(), let enc = cmd.makeComputeCommandEncoder() else {
                 throw SolverError.commandFailed("could not create command buffer")
             }
@@ -102,7 +125,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
             enc.setBuffer(rowBuffer, offset: 0, index: 2)
             enc.setBuffer(stackBuffer, offset: 0, index: 3)
             enc.setBuffer(state, offset: 0, index: 4)
-            enc.setBytes(&params, length: 8, index: 5)
+            enc.setBytes(&params, length: MemoryLayout<GPUParams>.stride, index: 5)
             enc.dispatchThreadgroups(MTLSize(width: depthCount, height: 1, depth: 1),
                                      threadsPerThreadgroup: MTLSize(width: threads, height: 1, depth: 1))
             enc.endEncoding()
@@ -112,7 +135,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
             gpuSeconds += cmd.gpuEndTime - cmd.gpuStartTime
             done += chunk
             let ptr = state.contents().bindMemory(to: Float.self, capacity: initial.count)
-            let weight = Double(done) * Double(done + 1) / 2
+            let weight = Self.strategyWeight(iterations: done, algorithm: algorithm)
             for d in 0..<depthCount {
                 let base = d * floatsPerDepth
                 let p = (0..<n).map { Double(ptr[base + 4 * s + $0]) / weight }
@@ -121,7 +144,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
             }
         }
         let ptr = state.contents().bindMemory(to: Float.self, capacity: initial.count)
-        let weight = Double(iterations) * Double(iterations + 1) / 2
+        let weight = Self.strategyWeight(iterations: iterations, algorithm: algorithm)
         return (0..<depthCount).map { d in
             let base = d * floatsPerDepth
             return PushFoldSolution(stack: stacks[d],
@@ -139,7 +162,28 @@ public final class MetalCFRSolver: @unchecked Sendable {
     constant uint N = 169;
     constant uint P = 176;   // padded row stride
 
-    struct Params { uint iterations; uint startIteration; };
+    // mode 0: CFR+ (regrets floored at 0, linear averaging). mode 1: Discounted CFR.
+    struct Params { uint iterations; uint startIteration; uint mode; float alpha; float beta; float gamma; };
+
+    struct Discounts { float pos; float neg; float sum; float weight; };
+
+    inline Discounts discounts(constant Params &pr, float t) {
+        Discounts d;
+        if (pr.mode == 0) { d.pos = 1; d.neg = 1; d.sum = 1; d.weight = t; return d; }
+        float ta = pow(t, pr.alpha), tb = pow(t, pr.beta);
+        d.pos = ta / (ta + 1); d.neg = tb / (tb + 1);
+        d.sum = pow(t / (t + 1), pr.gamma); d.weight = 1;
+        return d;
+    }
+
+    inline float updateRegret(constant Params &pr, Discounts d, float r, float inst) {
+        return pr.mode == 0 ? max(r + inst, 0.0f) : r * (r > 0 ? d.pos : d.neg) + inst;
+    }
+
+    inline float positiveShare(float a, float b) {
+        a = max(a, 0.0f); float s = a + max(b, 0.0f);
+        return s > 0 ? a / s : 0.5f;
+    }
 
     // State per depth, 8 * P floats: regretPush, regretFold, regretCall, regretPass,
     // sumPush, sumCall, push, call.
@@ -172,6 +216,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
 
         for (uint k = 0; k < params.iterations; k++) {
             const float t = float(params.startIteration + k + 1);
+            const Discounts dc = discounts(params, t);
             float newP = 0;
             if (active) {
                 float ac = 0, wc = 0;
@@ -180,11 +225,10 @@ public final class MetalCFRSolver: @unchecked Sendable {
                 float vFold = -0.5f * r;
                 float pi = p[tid];
                 float v = pi * vPush + (1.0f - pi) * vFold;
-                sp += t * pi;
-                rp = max(rp + vPush - v, 0.0f);
-                rf = max(rf + vFold - v, 0.0f);
-                float sum = rp + rf;
-                newP = sum > 0 ? rp / sum : 0.5f;
+                sp += dc.weight * pi;
+                rp = updateRegret(params, dc, rp, vPush - v);
+                rf = updateRegret(params, dc, rf, vFold - v);
+                newP = positiveShare(rp, rf);
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
             if (active) { p[tid] = newP; }
@@ -197,14 +241,13 @@ public final class MetalCFRSolver: @unchecked Sendable {
                 float vFold = -wp;
                 float ci = c[tid];
                 float v = ci * vCall + (1.0f - ci) * vFold;
-                sc += t * ci;
-                rc = max(rc + vCall - v, 0.0f);
-                rx = max(rx + vFold - v, 0.0f);
-                float sum = rc + rx;
-                newC = sum > 0 ? rc / sum : 0.5f;
+                sc += dc.weight * ci;
+                rc = updateRegret(params, dc, rc, vCall - v);
+                rx = updateRegret(params, dc, rx, vFold - v);
+                newC = positiveShare(rc, rx);
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
-            if (active) { c[tid] = newC; }
+            if (active) { c[tid] = newC; sp *= dc.sum; sc *= dc.sum; }
             threadgroup_barrier(mem_flags::mem_threadgroup);
         }
         if (active) {
@@ -241,6 +284,7 @@ public final class MetalCFRSolver: @unchecked Sendable {
         threadgroup_barrier(mem_flags::mem_threadgroup);
         for (uint k = 0; k < params.iterations; k++) {
             const float t = float(params.startIteration + k + 1);
+            const Discounts dc = discounts(params, t);
             for (uint r = sg; r < N; r += groups) {
                 device const float *a = A + r * P;
                 device const float *w = W + r * P;
@@ -252,10 +296,10 @@ public final class MetalCFRSolver: @unchecked Sendable {
                     float vPush = S * ac + rs - wc, vFold = -0.5f * rs;
                     float pi = p[r];
                     float v = pi * vPush + (1.0f - pi) * vFold;
-                    sp[r] += t * pi;
-                    float a1 = max(rp[r] + vPush - v, 0.0f), b1 = max(rf[r] + vFold - v, 0.0f);
+                    sp[r] += dc.weight * pi;
+                    float a1 = updateRegret(params, dc, rp[r], vPush - v), b1 = updateRegret(params, dc, rf[r], vFold - v);
                     rp[r] = a1; rf[r] = b1;
-                    next[r] = (a1 + b1) > 0 ? a1 / (a1 + b1) : 0.5f;
+                    next[r] = positiveShare(a1, b1);
                 }
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
@@ -271,14 +315,14 @@ public final class MetalCFRSolver: @unchecked Sendable {
                     float vCall = S * ap, vFold = -wp;
                     float ci = c[r];
                     float v = ci * vCall + (1.0f - ci) * vFold;
-                    sc[r] += t * ci;
-                    float a1 = max(rc[r] + vCall - v, 0.0f), b1 = max(rx[r] + vFold - v, 0.0f);
+                    sc[r] += dc.weight * ci;
+                    float a1 = updateRegret(params, dc, rc[r], vCall - v), b1 = updateRegret(params, dc, rx[r], vFold - v);
                     rc[r] = a1; rx[r] = b1;
-                    next[r] = (a1 + b1) > 0 ? a1 / (a1 + b1) : 0.5f;
+                    next[r] = positiveShare(a1, b1);
                 }
             }
             threadgroup_barrier(mem_flags::mem_threadgroup);
-            for (uint i = tid; i < N; i += threads) c[i] = next[i];
+            for (uint i = tid; i < N; i += threads) { c[i] = next[i]; sp[i] *= dc.sum; sc[i] *= dc.sum; }
             threadgroup_barrier(mem_flags::mem_threadgroup);
         }
         for (uint i = tid; i < N; i += threads) {

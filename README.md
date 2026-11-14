@@ -22,10 +22,10 @@ monochrome first-party look, with VoiceOver labels, Dynamic Type and Reduce Moti
 
 | Tab | What it does |
 |---|---|
-| **Learn** | A 10-unit course (23 lessons, 19 question generators): EV and pot odds, equity vs ranges, preflop, what GTO is, toy games and indifference, push or fold, postflop structure, advanced balance, exploits, ICM. Questions are generated fresh each time and graded by the EV you gave up as a share of the pot: within 1% of the best option counts as correct (equal EV), then inaccuracy (≤ 5%), mistake (≤ 15%) and blunder, with the maths shown. Daily goal, streak and XP. |
-| **Lab** | **Equity Lab**: hand vs hand or range (`AKs, QQ+, A5s-A2s`), board, exact or Monte Carlo equity streamed live. **River solver**: both players' full ranges on one river, solved with Discounted CFR to 0.3% of the pot, then each range's strategy. **Push/fold solver**: heads-up Nash shove and call ranges by stack depth, CFR+ or DCFR, on the CPU (SIMD) or the GPU (Metal), with a convergence chart. **Toy games**: CFR, CFR+ and DCFR on Kuhn poker and the clairvoyance game, plotted live against the known answer (−1/18). **Scan a Table**: camera card reading (needs a trained model, see below). |
+| **Learn** | A 10-unit course (23 lessons, 19 question generators): EV and pot odds, equity vs ranges, preflop, what GTO is, toy games and indifference, push or fold, postflop structure, advanced balance, exploits, ICM. Questions are generated fresh each time and graded by the EV you gave up as a share of the pot: within 1% of the best option counts as correct (equal EV), then inaccuracy (≤ 5%), mistake (≤ 15%) and blunder, with the maths shown. On devices with Apple Intelligence, an "Explain in plain words" button has the on-device Foundation Model restate the solver's verdict (checked against the solver's numbers before it is shown). Daily goal, streak and XP. |
+| **Lab** | **Equity Lab**: hand vs hand or range (`AKs, QQ+, A5s-A2s`), board, exact or Monte Carlo equity streamed live. **River solver**: both players' full ranges on one river, solved with Discounted CFR to 0.3% of the pot, then each range's strategy (CPU by default; a Metal backend gives the same results). A multi-street engine also solves turns, and small flops, with every runout dealt. **Push/fold solver**: heads-up Nash shove and call ranges by stack depth, CFR+ or DCFR, on the CPU (SIMD) or the GPU (Metal, both algorithms), with a convergence chart. **Toy games**: CFR, CFR+ and DCFR on Kuhn poker and the clairvoyance game, plotted live against the known answer (−1/18). **Scan a Table**: camera card reading (needs a trained model, see below). |
 | **Practice** | **Adaptive review**: ten spots per session, due items first (FSRS-4.5 scheduling), then new questions pitched at about 75% success by a per-concept Elo model. **Daily spot**: the same spot for everyone that day. Drills: Equity Quiz, Pot Odds, Range Trainer (paint a 13×13 grid against Nash). |
-| **Profile** | Streak, spots answered and accuracy, accuracy over the last 30 days (Swift Charts), leaks by category (weakest first) and recent sessions. |
+| **Profile** | Streak, spots answered and accuracy, accuracy over the last 30 days (Swift Charts), leaks by category (weakest first) and recent sessions. A Model check card scores the adaptive model's predictions against your real answers (AUC, log loss, Brier vs a baseline) after 30 answers; Settings exports the answer log as CSV. |
 | **Extras** | Daily drill widget (small, medium, Lock Screen), Live Activity for drill sessions, App Intents / Siri Shortcuts, deep links (`pokerlab://learn`, `pokerlab://daily`, `pokerlab://solver`, `pokerlab://river`, `pokerlab://toys`, `pokerlab://camera`) |
 
 ### The course
@@ -34,7 +34,7 @@ monochrome first-party look, with VoiceOver labels, Dynamic Type and Reduce Moti
 |---|---|---|
 | 1 | EV and pot odds | Required equity s/(2s+1); call-or-fold EV against a range |
 | 2 | Equity vs ranges | Exact (or Monte Carlo) equity |
-| 3 | Preflop foundations | 6-max opening widths; open or fold on clear-cut hands |
+| 3 | Preflop foundations | Solved 6-max first-in shove/fold charts per seat (graded by EV); 100 bb opening widths (sourced) |
 | 4 | What GTO is | Kuhn poker equilibrium (value −1/18) |
 | 5 | Toy games and indifference | MDF 1/(1+s), alpha s/(1+s), bluff share s/(2s+1), bluff-catching EV |
 | 6 | Push or fold | Nash solve per stack depth; per-hand shove and call EVs |
@@ -114,6 +114,13 @@ estimated. iPhone numbers are not measured yet (they need a device and a signing
 | DCFR vs CFR+ on push/fold, iterations to 0.01 mbb/hand | 99 vs 446 (4.5× fewer) |
 | Kuhn poker to within 1e-4 of −1/18 | CFR+ 1.31 ms, DCFR 3.11 ms, CFR 34.75 ms |
 | 10 bb Nash | shove 58.3%, call 37.4%; exploitability 0.002 mbb/hand after 1,000 iterations |
+| Metal DCFR vs CFR+ on push/fold, iterations to 0.01 mbb/hand | 99 vs 446 (same as the CPU) |
+| 6-max first-in shove, 10 bb (UTG / HJ / CO / BTN / SB) | 15.4% / 19.4% / 24.9% / 32.6% / 58.3%, NashConv < 1e-5 bb |
+| Turn, BB vs BTN, 1 size, to ≤ 0.33% of pot | 0.73 s, 11 MB peak; any two cards 3.64 s, 18 MB |
+| Turn, 2 sizes + all-in, 1 raise | 24.85 s, 35 MB (scalar, no isomorphism yet) |
+| Flop, narrow ranges, 1 size | 11.15 s, 60 MB; full-range flops would need > 1 GB |
+| River solver, Metal vs CPU, 200 iterations | 0.38–0.46× the CPU's speed, same results; CPU stays default |
+| Foundation Models explanation, on-device (Mac) | 1.6–3.5 s per reply; 6/6 pass the grounding check |
 
 ## Tests
 
@@ -121,7 +128,7 @@ estimated. iPhone numbers are not measured yet (they need a device and a signing
 cd Engine && swift test -c release -Xswiftc -enable-testing
 ```
 
-124 Swift Testing tests: PokerCore 31, PokerSolver 30, PokerCourse 32, PokerTraining 15,
+145 Swift Testing tests: PokerCore 31, PokerSolver 42, PokerCourse 41, PokerTraining 15,
 CardRecognitionCore 16. They include the evaluator matching the reference on 1,000,000 random
 hands, exact category counts over all 133,784,560 seven-card hands, push/fold results matching
 published charts, river and clairvoyance solves matching their closed forms, and the
@@ -129,7 +136,8 @@ isomorphic river solve matching the full solve. Run them in release: in a debug 
 exhaustive evaluator tests saturate every core, which makes the timing-based cancellation
 test (`cancellingTheConsumerStopsTheStream`) time out.
 
-12 UI tests cover lessons, drills, the solvers and a regression test for re-solving toy games:
+13 UI tests cover lessons, drills, the solvers, a regression test for re-solving toy games and the AI
+explanation (skipped where Apple Intelligence is unavailable, as in the simulator):
 
 ```bash
 xcodebuild -project PokerLab.xcodeproj -scheme PokerLab -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test
@@ -180,9 +188,10 @@ yet, and a fake model would be worse than none. Until you add one, the screen ex
 ## Still to do
 
 - Apple Developer team ID, bundle ID prefix, App Group and CloudKit container (Setup steps 2–4).
-- iPhone benchmark numbers, and a device pass over the camera, widgets, Live Activity and Siri
-  phrases (all built and compiled, so far exercised only in the simulator).
+- iPhone benchmark numbers (solvers and AI explanations), and a device pass over the camera,
+  widgets, Live Activity, Siri phrases and the Explain button (so far exercised only in the
+  simulator or on the Mac).
 - Training photos and a `CardDetector.mlmodel`.
-- Unit 3 (preflop opening) grades against an equity ranking, not a solved or published chart.
-- DCFR and the river solver run on the CPU; the Metal kernels are CFR+ push/fold only.
-- The adaptive model is validated on simulated learners only; it needs real review logs.
+- Real answer logs, so the Model check has something to score.
+- Next features (calibration game, ICM solver, river lab grid and node locking, flop library,
+  FSRS weight fitting, widget restyle, timed mode and 3-bet charts): see [docs/ROADMAP.md](docs/ROADMAP.md).

@@ -1,5 +1,9 @@
 import PokerCore
 import PokerSolver
+import PokerCourse
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
 import Darwin
 
 // PokerBench: prints throughput numbers for BENCHMARKS.md. Run with:
@@ -32,6 +36,10 @@ if mode == "core" || mode == "all" { try await runCore() }
 if mode == "solver" || mode == "all" { try await runSolver() }
 if mode == "toy" || mode == "all" { runToy() }
 if mode == "dcfr" || mode == "all" { await runDCFR() }
+if mode == "firstin" || mode == "all" { runFirstIn() }
+if mode == "rivergpu" { runRiverGPU() }
+if mode == "explain" { await runExplain() }
+if mode == "street" { runStreet(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 if mode == "river" || mode == "all" { runRiver(only: CommandLine.arguments.dropFirst(2).first.flatMap(Int.init)) }
 print("")
 print("checksum \(checksum)")
@@ -241,6 +249,20 @@ func runDCFR() async {
         }
         print(line + " | wall incl. checks \(fmt(wall, 2)) s")
     }
+    #if canImport(Metal)
+    if let gpu = try? MetalCFRSolver() {
+        for algorithm in [CFRPlusSolver.Algorithm.cfrPlus, .dcfr] {
+            let sols = try! gpu.solve(stacks: stacks, iterations: 2000, checkpointEvery: 10, algorithm: algorithm)
+            var line = ("Metal " + algorithm.name).padding(toLength: 26, withPad: " ", startingAt: 0)
+            for target in targets {
+                let reached = sols.compactMap { s in s.curve.first { $0.exploitability < target }?.iteration }
+                let mean = reached.isEmpty ? 0 : Double(reached.reduce(0, +)) / Double(reached.count)
+                line += " | < \(target): mean \(fmt(mean, 0)) (\(reached.count)/40)"
+            }
+            print(line + " | GPU \(fmt(sols[0].elapsedSeconds * 1000, 1)) ms for 2,000 iterations x 40 depths")
+        }
+    }
+    #endif
 }
 
 /// Process peak physical footprint (what jetsam limits on iOS), in MB.
@@ -283,4 +305,92 @@ func runRiver(only: Int?) {
         print("\(entry.name): hands \(h.oop)/\(h.ip) (canonical \(k.oop)/\(k.ip)), \(solver.decisionNodeCount) decision nodes, tables \(fmt(Double(solver.storageBytes) / 1_048_576, 2)) MB")
         print("   \(r.iterations) iterations, exploitability \(fmt(r.exploitability, 3))% pot, solve \(fmt(r.solveSeconds * 1000, 1)) ms, setup \(fmt(setup * 1000, 1)) ms, wall incl. checks \(fmt(wall * 1000, 1)) ms, process peak footprint \(fmt(peakFootprintMB(), 1)) MB")
     }
+}
+
+/// 6-max first-in shove charts: range size per seat, NashConv and solve time.
+func runFirstIn() {
+    print("\n6-max first-in shove/fold (DCFR, 1,500 iterations, at most one caller)")
+    for stack in [10.0, 15.0] {
+        for seat in [FirstInShoveSolver.Seat.utg, .hj, .co, .btn, .sb] {
+            let clock = ContinuousClock(); let t0 = clock.now
+            let s = FirstInShoveSolver.shared.solve(seat: seat, stack: stack)
+            let ms = seconds(clock.now - t0) * 1000
+            let callers = s.callers.map { "\($0.seat.name) \(fmt($0.call.enumerated().reduce(0) { $0 + $1.element * Double(HandClass(index: $1.offset).comboCount) } / 13.26, 1))%" }.joined(separator: ", ")
+            print("\(Int(stack)) bb \(seat.name.padding(toLength: 3, withPad: " ", startingAt: 0)): shove \(fmt(s.pushFraction * 100, 1))% | call: \(callers) | NashConv \(String(format: "%.5f", s.nashConv)) bb | \(fmt(ms, 0)) ms")
+        }
+    }
+}
+
+func streetSpots() -> [(name: String, spot: StreetSpot)] {
+    func c(_ s: String) -> [Card] { CardSet(parsing: s)!.sortedForDisplay }
+    let bb = try! HandRange("22+, A2s+, K2s+, Q4s+, J6s+, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K7o+, Q8o+, J8o+, T8o+, 98o")
+    let btn = try! HandRange("22+, A2s+, K5s+, Q8s+, J8s+, T8s+, 97s+, 86s+, 75s+, 65s, 54s, A7o+, K9o+, QTo+, JTo")
+    let one = RiverTreeConfig(betSizes: [0.66], raiseSizes: [], allowAllIn: false, maxBets: 1)
+    let two = RiverTreeConfig(betSizes: [0.33, 0.75], raiseSizes: [], allowAllIn: true, maxBets: 2)
+    return [
+        ("Turn, BB vs BTN, 1 size, no raises", StreetSpot(board: c("Ks9h5c4d"), pot: 10, stack: 50, oop: bb, ip: btn, config: one)),
+        ("Turn, BB vs BTN, 2 sizes + all-in, 1 raise", StreetSpot(board: c("Ks9h5c4d"), pot: 10, stack: 50, oop: bb, ip: btn, config: two)),
+        ("Turn, any two cards, 1 size, no raises", StreetSpot(board: c("Ks9h5c4d"), pot: 10, stack: 50, oop: .all, ip: .all, config: one)),
+        ("Flop, narrow ranges, 1 size", StreetSpot(board: c("Kh8d3c"), pot: 10, stack: 20,
+            oop: try! HandRange("KK, 88, 33, AK, KQs, QJs, JTs"), ip: try! HandRange("AA, KK, AK, AQs, KQ"), config: one)),
+    ]
+}
+
+/// Multi-street solves to 0.5% pot exploitability (checked every 10 iterations, not timed).
+func runStreet(only: Int?) {
+    print("\nMulti-street solver: DCFR(1.5, 0, 2) to 0.5% pot exploitability, checked every 10 iterations, 1 thread")
+    for (i, entry) in streetSpots().enumerated() where only == nil || only == i {
+        let clock = ContinuousClock(); let t0 = clock.now
+        let solver = try! StreetSolver(spot: entry.spot)
+        let setup = seconds(clock.now - t0)
+        let r = solver.solve(targetExploitability: 0.5, maxIterations: 2000, checkEvery: 10)
+        let h = solver.handCounts
+        print("\(entry.name): hands \(h.oop)/\(h.ip), \(solver.decisionNodeCount) decision nodes, \(solver.chanceNodeCount) chance nodes, tables \(fmt(Double(solver.storageBytes) / 1_048_576, 1)) MB")
+        print("   \(r.iterations) iterations, exploitability \(fmt(r.exploitability, 3))% pot, solve \(fmt(r.solveSeconds, 2)) s, setup \(fmt(setup * 1000, 0)) ms, peak footprint \(fmt(peakFootprintMB(), 0)) MB")
+    }
+}
+
+/// River solver: CPU (SIMD, sort-and-sweep) vs Metal (batched O(n^2) terminals), 200 iterations.
+func runRiverGPU() {
+    #if canImport(Metal)
+    print("\nRiver solver, 200 DCFR iterations: CPU vs Metal backend (no exploitability checks)")
+    for (i, entry) in riverSpots().enumerated() where [0, 4, 5].contains(i) {
+        let cpu = try! RiverSolver(spot: entry.spot), gpuSolver = try! RiverSolver(spot: entry.spot)
+        let gpu = try! MetalRiverBackend(solver: gpuSolver)
+        let clock = ContinuousClock()
+        var t0 = clock.now; cpu.iterate(200); let cpuMs = seconds(clock.now - t0) * 1000
+        t0 = clock.now; gpu.iterate(200); let gpuWall = seconds(clock.now - t0) * 1000
+        let diff = abs(cpu.exploitability() - gpuSolver.exploitability())
+        print("\(entry.name): CPU \(fmt(cpuMs, 1)) ms | Metal \(fmt(gpuWall, 1)) ms wall (\(fmt(gpu.gpuSeconds * 1000, 1)) ms GPU) | \(gpu.terminals.count) terminals | exploitability difference \(String(format: "%.4f", diff)) pp | CPU/Metal \(fmt(cpuMs / gpuWall, 2))x")
+    }
+    #endif
+}
+
+/// Asks the on-device Foundation Model to explain generated questions, and checks each reply
+/// against the solver's numbers with ExplanationPrompt.unsupportedNumbers.
+func runExplain() async {
+    #if canImport(FoundationModels)
+    guard #available(macOS 26.0, *) else { print("needs macOS 26"); return }
+    print("\nFoundation Models explanations (availability: \(SystemLanguageModel.default.availability))")
+    var kept = 0, withheld = 0
+    let templates: [TemplateID] = [.callOrFold, .mdf, .pushFold, .bluffCatch, .riverDefend, .icmCall]
+    for (k, t) in templates.enumerated() {
+        let q = try! await t.generate(seed: UInt64(100 + k))
+        let worst = q.options.indices.min { q.options[$0].ev < q.options[$1].ev }!
+        let verdict = q.grade(worst).verdict.title
+        let clock = ContinuousClock(); let t0 = clock.now
+        do {
+            let session = LanguageModelSession(instructions: ExplanationPrompt.instructions)
+            let reply = try await session.respond(to: ExplanationPrompt.prompt(q, choice: worst),
+                                                  options: GenerationOptions(temperature: 0)).content
+            let ok = ExplanationPrompt.accept(reply, for: q)
+            if ok { kept += 1 } else { withheld += 1 }
+            print("--- \(t.rawValue) (chose \(q.options[worst].label), \(verdict)) \(fmt(seconds(clock.now - t0), 1)) s: \(ok ? "kept" : "withheld")")
+            print(reply.trimmingCharacters(in: .whitespacesAndNewlines))
+        } catch {
+            print("--- \(t.rawValue): error \(error)")
+        }
+    }
+    print("kept \(kept), withheld \(withheld)")
+    #endif
 }

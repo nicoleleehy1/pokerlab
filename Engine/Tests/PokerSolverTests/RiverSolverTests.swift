@@ -148,3 +148,38 @@ struct RiverSolverTests {
         #expect(solver.nodes[facing].actions.map(\.kind) == [.fold, .call, .raise, .allIn])
     }
 }
+
+#if canImport(Metal)
+import Metal
+
+@Suite("River solver on Metal")
+struct RiverSolverMetalTests {
+    /// The GPU backend runs the same DCFR iterations: after 120 iterations its strategies give
+    /// the same exploitability and EVs as the CPU solver.
+    @Test func gpuMatchesCPU() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { return }
+        let spot = RiverSpot(board: CardSet(parsing: "2c7c9cJdKd")!.sortedForDisplay, pot: 10, stack: 40,
+                             oop: try HandRange("22+, A2s+, KTs+, QTs+, JTs, ATo+, KJo+"), ip: try HandRange("33+, A8s+, KQs, AJo+"))
+        let cpu = try RiverSolver(spot: spot), gpuSolver = try RiverSolver(spot: spot)
+        let gpu = try MetalRiverBackend(solver: gpuSolver)
+        cpu.iterate(120); gpu.iterate(120)
+        #expect(gpuSolver.iteration == 120)
+        #expect(abs(cpu.exploitability() - gpuSolver.exploitability()) < 0.01, "\(cpu.exploitability()) vs \(gpuSolver.exploitability())")
+        #expect(abs(cpu.expectedValues().oop - gpuSolver.expectedValues().oop) < 0.01)
+        #expect(gpu.gpuSeconds > 0)
+    }
+
+    /// The clairvoyance game solved on the GPU still matches its closed form.
+    @Test func gpuClairvoyance() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { return }
+        let board = CardSet(parsing: "2c5d8hJcKs")!.sortedForDisplay
+        let air = HandRange(combos: try HandRange("43o").combos.map { .init($0.cards, weight: 0.5) })
+        let oop = HandRange(combos: try HandRange("AA").combos + air.combos)
+        let config = RiverTreeConfig(betSizes: [1], raiseSizes: [], allowAllIn: false, maxBets: 1, oopCanBet: true, ipCanBet: false)
+        let solver = try RiverSolver(spot: RiverSpot(board: board, pot: 10, stack: 100, oop: oop, ip: try HandRange("QQ"), config: config))
+        try MetalRiverBackend(solver: solver).iterate(2000)
+        #expect(solver.exploitability() < 0.05)
+        #expect(abs((solver.expectedValues().oop + 5) / 10 - 0.75) < 0.002)
+    }
+}
+#endif

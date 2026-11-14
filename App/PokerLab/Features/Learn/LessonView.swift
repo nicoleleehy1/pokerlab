@@ -1,5 +1,6 @@
 import SwiftUI
 import PokerCore
+import PokerCourse
 
 /// One multiple-choice question as the lesson screen shows it.
 struct LessonQuestionData: Identifiable, Sendable {
@@ -26,6 +27,8 @@ struct LessonQuestionData: Identifiable, Sendable {
     var lossFractions: [Double] = []
     /// Template the question came from (for the adaptive layer).
     var templateID: String?
+    /// The generated question, for an on-device explanation (nil: not offered).
+    var source: Question?
 
     func feedbackTitle(for choice: Int) -> String {
         if choice < optionTitles.count { return optionTitles[choice] }
@@ -184,6 +187,9 @@ struct LessonView: View {
                     FeedbackPanel(title: q.feedbackTitle(for: pick), message: q.feedbackMessage(for: pick))
                         .accessibilityIdentifier("lesson-feedback")
                         .transition(.opacity)
+                    if let source = q.source, Explainer.isAvailable {
+                        ExplainSection(question: source, choice: pick).id(q.id)
+                    }
                 }
             }
             .padding(.bottom, 16)

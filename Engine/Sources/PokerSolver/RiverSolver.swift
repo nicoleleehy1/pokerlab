@@ -91,7 +91,7 @@ public final class RiverSolver: @unchecked Sendable {
     var sides: [Side] = [Side(), Side()]
     var regrets: [Float] = []
     var strategySum: [Float] = []
-    public private(set) var iteration = 0
+    public internal(set) var iteration = 0
     public private(set) var usesIsomorphism = false
     /// Normaliser: total weight of compatible (OOP, IP) hand pairs.
     let pairMass: Double

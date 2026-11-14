@@ -12,6 +12,7 @@ struct ProfileView: View {
     @State private var summary = ProgressSummary()
     @Query(sort: \PlayerProfile.createdAt) private var profiles: [PlayerProfile]
     @Query private var lessons: [LessonResult]
+    @Query(sort: \AnswerLogEntry.day) private var answerLog: [AnswerLogEntry]
 
     /// Streak and totals include course lessons as well as drills.
     private var course: CourseProgress {
@@ -35,6 +36,7 @@ struct ProfileView: View {
                         StatTile(title: "Accuracy", value: overallAccuracy.map { Theme.percent($0, digits: 0) } ?? "–")
                     }
                     MasteryCard(state: profiles.first?.adaptive ?? AdaptiveState())
+                    ModelCheckCard(events: answerLog.compactMap(\.event))
                     if summary.totalAttempts == 0 {
                         Text("Finish a drill and your accuracy over time shows up here.")
                             .font(Theme.caption).foregroundStyle(Theme.muted)

@@ -29,7 +29,8 @@ extension LessonQuestionData {
                   facts: q.facts.map { .init(label: $0.label, value: $0.value) },
                   options: q.options.map(\.label), correct: q.correctOptions, explanation: q.explanation,
                   optionNotes: notes, optionTitles: titles, lossFractions: graded.map(\.lossFraction),
-                  templateID: q.id.split(separator: "-").first.map(String.init))
+                  templateID: q.id.split(separator: "-").first.map(String.init),
+                  source: q)
     }
 
     static func pct(_ x: Double) -> String { x.formatted(.percent.precision(.fractionLength(0...1))) }

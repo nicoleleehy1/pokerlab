@@ -106,13 +106,15 @@ final class PlayerProfile {
     /// Adaptive-layer clock: fractional days.
     static func adaptiveNow(_ date: Date = .now) -> Double { date.timeIntervalSinceReferenceDate / 86_400 }
 
-    /// Feeds a finished lesson's answers to FSRS and Elo.
-    func recordAdaptive(_ outcome: LessonOutcome) {
+    /// Feeds a finished lesson's answers to FSRS and Elo, and logs each answer with the
+    /// predictions the model made before it (for evaluating the model on real usage).
+    func recordAdaptive(_ outcome: LessonOutcome, in context: ModelContext) {
         var state = adaptive
         let now = Self.adaptiveNow()
         for (i, id) in outcome.templateIDs.enumerated() {
             guard let id, let t = TemplateID(rawValue: id) else { continue }
-            state.record(t, lossFraction: outcome.lossFractions[i], seconds: outcome.durations[i], at: now)
+            let event = state.log(t, lossFraction: outcome.lossFractions[i], seconds: outcome.durations[i], at: now)
+            context.insert(AnswerLogEntry(event))
         }
         adaptive = state
     }
@@ -152,7 +154,33 @@ final class LessonResult {
     }
 }
 
+/// One logged course answer with the adaptive model's prior predictions.
+@Model
+final class AnswerLogEntry {
+    var id: UUID = UUID()
+    var date: Date = Date.now
+    var day: Double = 0
+    var templateID: String = ""
+    var correct: Bool = false
+    var lossFraction: Double = 0
+    var seconds: Double = -1                  // -1: not timed
+    var eloPrediction: Double = 0.5
+    var fsrsRetrievability: Double = -1       // -1: first review of the template
+
+    init(_ e: AnswerEvent) {
+        day = e.day; templateID = e.template.rawValue; correct = e.correct; lossFraction = e.lossFraction
+        seconds = e.seconds ?? -1; eloPrediction = e.eloPrediction; fsrsRetrievability = e.fsrsRetrievability ?? -1
+    }
+
+    var event: AnswerEvent? {
+        guard let t = TemplateID(rawValue: templateID) else { return nil }
+        return AnswerEvent(day: day, template: t, correct: correct, lossFraction: lossFraction,
+                           seconds: seconds < 0 ? nil : seconds, eloPrediction: eloPrediction,
+                           fsrsRetrievability: fsrsRetrievability < 0 ? nil : fsrsRetrievability)
+    }
+}
+
 enum PokerLabSchema {
     static let models: [any PersistentModel.Type] = [TrainingSession.self, DrillAttempt.self, SavedSpot.self, PlayerProfile.self,
-                                                     LessonResult.self]
+                                                     LessonResult.self, AnswerLogEntry.self]
 }
